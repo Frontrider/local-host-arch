@@ -12,7 +12,7 @@ Contains a falkon browser(low overhead), a file manager, a terminal emulator, a 
 
 Burn the image to a pendrive (we recommend rufus on windows, SUSE studio image writer for linux), boot from it then follow the installer.
 
-The live ISO autologins; installed systems boot to the LightDM login screen. Lock the desktop manually with <kbd>Super</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd> or the **Lock** bar button.
+The live ISO autologins; installed systems boot to the LightDM login screen.
 
 On laptops, closing the lid stops LightDM and the X server; opening the lid starts LightDM again. The live installer ignores lid events so an installation is not interrupted.
 
