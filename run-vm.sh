@@ -21,6 +21,9 @@ DISK="${VM_DISK:-}"
 DISK_SIZE="${VM_DISK_SIZE:-25G}"
 NO_DISK=false
 BOOT_MODE="${VM_BOOT:-iso}"
+RESET_INSTALL=false
+KEEP_INSTALL=false
+EXPLICIT_RESET=false
 FIRMWARE="uefi"
 DISPLAY_MODE="${VM_DISPLAY:-auto}"
 VNC_ADDR="${VM_VNC:-127.0.0.1:0}"
@@ -30,6 +33,22 @@ display_desc=""
 msg()  { printf '==> %s\n' "$*"; }
 info() { printf '    %s\n' "$*"; }
 die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+reset_install() {
+    msg "Removing existing install"
+    if pgrep -f 'qemu-system-x86_64' >/dev/null 2>&1; then
+        die "a QEMU VM is running; shut it down before resetting the install"
+    fi
+    local f removed=false
+    for f in "$DISK" "$VM_DIR/OVMF_VARS.fd"; do
+        if [[ -e $f ]]; then
+            rm -f -- "$f" || die "cannot remove $f; run ./build.sh once (fixes ownership) or remove it with sudo"
+            info "removed $f"
+            removed=true
+        fi
+    done
+    $removed || info "no existing install found"
+}
 
 usage() {
     cat <<EOF
@@ -45,6 +64,9 @@ Options:
       --no-disk          boot without a disk
       --disk-size SIZE   size for a newly created disk (default: $DISK_SIZE)
       --boot MODE        boot the live "iso" or the installed disk (default: $BOOT_MODE)
+      --reset-install    delete the install disk and UEFI vars, then boot fresh
+      --keep-install     keep the install disk when booting the ISO
+                         (ISO boots reset it by default)
       --bios             legacy SeaBIOS instead of UEFI/OVMF
       --display MODE     auto, gtk, sdl, vnc or none (gtk/sdl are optional; default: $DISPLAY_MODE)
       --vnc ADDR         VNC listen address, e.g. 127.0.0.1:1 (default: $VNC_ADDR)
@@ -68,6 +90,8 @@ while (($#)); do
         --no-disk)        NO_DISK=true; shift ;;
         --disk-size)      DISK_SIZE="${2:?missing value for $1}"; shift 2 ;;
         --boot)           BOOT_MODE="${2:?missing value for $1}"; shift 2 ;;
+        --reset-install)  RESET_INSTALL=true; EXPLICIT_RESET=true; shift ;;
+        --keep-install)   KEEP_INSTALL=true; shift ;;
         --bios)           FIRMWARE="bios"; shift ;;
         --display)        DISPLAY_MODE="${2:?missing value for $1}"; shift 2 ;;
         --vnc)            VNC_ADDR="${2:?missing value for $1}"; shift 2 ;;
@@ -91,6 +115,15 @@ if $NO_DISK && [[ $BOOT_MODE == "installed" ]]; then
     die "--boot installed needs a disk (remove --no-disk)"
 fi
 
+if $RESET_INSTALL && $KEEP_INSTALL; then
+    die "--reset-install and --keep-install are mutually exclusive"
+fi
+
+if $RESET_INSTALL; then
+    $NO_DISK && die "--reset-install needs a disk (remove --no-disk)"
+    [[ $BOOT_MODE == "installed" ]] && die "--reset-install cannot be combined with --boot installed"
+fi
+
 if $NO_DISK; then
     DISK=""
 fi
@@ -98,7 +131,19 @@ fi
 if ! $NO_DISK && [[ -z $DISK ]]; then
     DISK="$VM_DIR/disk.qcow2"
 fi
-mkdir -p "$VM_DIR"
+mkdir -p "$VM_DIR" 2>/dev/null || die "cannot create $VM_DIR"
+[[ -w $VM_DIR ]] || die "$VM_DIR is not writable; run ./build.sh once (it fixes ownership) or chown it to $(id -u):$(id -g)"
+
+if $RESET_INSTALL && $EXPLICIT_RESET; then
+    reset_install
+fi
+
+# Booting the live ISO always starts with a fresh install target, unless the
+# user explicitly keeps the default disk or supplies a custom one.
+if [[ $BOOT_MODE == "iso" ]] && ! $KEEP_INSTALL && ! $NO_DISK &&
+   [[ $DISK == "$VM_DIR/disk.qcow2" ]]; then
+    RESET_INSTALL=true
+fi
 
 if [[ $BOOT_MODE == "iso" ]]; then
     if [[ -z $ISO ]]; then
@@ -126,6 +171,10 @@ else
         info "ignoring ISO argument in --boot installed mode"
         ISO=""
     fi
+fi
+
+if $RESET_INSTALL && ! $EXPLICIT_RESET; then
+    reset_install
 fi
 
 accel="tcg"

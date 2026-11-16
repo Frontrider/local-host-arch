@@ -22,6 +22,14 @@ xterm
 thunar
 gvfs
 
+## System tools
+xfce4-taskmanager
+
+## NetworkManager UI
+network-manager-applet
+nm-connection-editor
+snixembed
+
 ## Text editor
 mousepad
 
@@ -44,8 +52,6 @@ accountsservice
 
 ## Lock screen
 i3lock
-xss-lock
-xorg-xset
 
 ## Fonts and icons
 ttf-dejavu

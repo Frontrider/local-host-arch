@@ -177,9 +177,15 @@ volumes:
     driver: local
   caddy_config:
     driver: local
+  # This is the main data volume.
+  # Every user facing program should use it for files they should see.
   data:
     name: localhost_data
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data
   tailscale_state:
     driver: local
   global_env:

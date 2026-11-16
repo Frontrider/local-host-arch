@@ -102,9 +102,9 @@ bar {
 
 exec --no-startup-id xsetroot -solid "#1d1f21"
 
-# Lock screen after 10 minutes of inactivity and on logind lock/sleep.
-exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock -n -c 1d1f21
-exec --no-startup-id xset s 600 600
+# Locking is manual only (Super+Shift+L or the Lock bar button). There is no
+# idle auto-lock, so the live installer can sit unattended without i3lock
+# covering it.
 
 # Manjaro's update notifier. pamac-tray is a GtkStatusIcon, i.e. an XEmbed
 # tray icon, which i3bar displays natively (tray_output primary).
@@ -112,6 +112,10 @@ exec --no-startup-id sh -c 'GDK_BACKEND=x11 pamac-tray'
 
 # Authentication agent for pamac-manager transactions.
 exec --no-startup-id /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
+
+# NetworkManager applet. nm-applet registers a StatusNotifierItem, so
+# snixembed proxies it into i3bar's XEmbed tray.
+exec --no-startup-id sh -c 'snixembed --fork; exec nm-applet'
 
 # Manjaro Hello (welcome / install). Respect its autostart toggle: the
 # package's skel entry is copied to the live user's home.

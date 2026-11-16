@@ -261,7 +261,7 @@ run_checks() {
 
 prepare_dirs() {
     mkdir -p "$OUT_DIR" "$WORK_DIR/chroots" "$WORK_DIR/logs" "$WORK_DIR/tmp" \
-             "$CONF_DIR"
+             "$WORK_DIR/vm" "$CONF_DIR"
 
     # manjaro-tools configuration for this project only. buildiso gets
     # HOME=$CONF_HOME and no SUDO_USER, so it reads these files instead of
@@ -276,7 +276,7 @@ target_branch="$BRANCH"
 target_arch="x86_64"
 EOF
 
-    chown -R "$RUN_UID:$RUN_GID" "$CONF_HOME" "$WORK_DIR/logs" "$OUT_DIR" 2>/dev/null || true
+    chown -R "$RUN_UID:$RUN_GID" "$CONF_HOME" "$WORK_DIR/logs" "$WORK_DIR/vm" "$OUT_DIR" 2>/dev/null || true
 }
 
 # --- stale build detection ------------------------------------------------
