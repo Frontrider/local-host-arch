@@ -1,0 +1,16 @@
+[Unit]
+Description=local-host Docker Compose stack
+Documentation=file:/etc/local-host/docker-compose.yaml
+Requires=docker.service
+After=docker.service network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/etc/local-host
+ExecStart=/usr/local/bin/local-host-compose
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

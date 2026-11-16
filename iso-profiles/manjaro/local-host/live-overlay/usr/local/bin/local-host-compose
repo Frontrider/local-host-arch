@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# Keep the local-host Docker Compose stack running.
+#
+# Started by local-host-compose.service as root. `docker compose up -d` is
+# idempotent, so repeating it starts stopped containers, recreates changed
+# ones and leaves healthy ones alone. The container-level restart policies
+# in the compose file handle crashes between iterations.
+
+set -u
+
+COMPOSE_DIR="${LOCALHOST_COMPOSE_DIR:-/etc/local-host}"
+COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yaml"
+ENV_FILE="$COMPOSE_DIR/env"
+INTERVAL="${LOCALHOST_COMPOSE_INTERVAL:-30}"
+
+cd "$COMPOSE_DIR" || exit 1
+
+# The tailscale/anywherelan container needs this; modules-load.d/tun.conf
+# loads the module early, this is only a safety net.
+if [[ ! -e /dev/net/tun ]]; then
+    modprobe tun 2>/dev/null || true
+fi
+
+# Bind-mount sources used by the compose file. Docker would create them as
+# root too, but doing it here keeps the tree predictable.
+mkdir -p logs/caddy logs/tailscale logs/anywherelan logs/fail2ban logs/host-monitor
+
+# Wait for dockerd (docker.service may still be starting).
+until docker info >/dev/null 2>&1; do
+    sleep 2
+done
+
+while :; do
+    if ! docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d; then
+        echo "local-host compose: up failed, retrying in 10s" >&2
+        sleep 10
+        continue
+    fi
+    sleep "$INTERVAL"
+done

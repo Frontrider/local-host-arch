@@ -1,0 +1,9 @@
+# Ignore build artefacts.
+/out/
+/work/
+*.iso
+*.iso.sig
+*.sha256
+
+# CI release staging
+/dist/

@@ -1,0 +1,61 @@
+# Packages added on top of rootfs.sfs to build desktopfs.sfs (and then
+# livefs.sfs, which overlays it).
+
+## Xorg
+xorg-server
+xorg-xinit
+xorg-xrandr
+xorg-xsetroot
+xf86-input-libinput
+xf86-video-vesa
+mesa
+
+## Window manager and launcher
+i3-wm
+rofi
+
+## Terminal emulators
+xfce4-terminal
+xterm
+
+## File manager
+thunar
+gvfs
+
+## Text editor
+mousepad
+
+## Browser
+falkon
+
+## Containers
+docker
+docker-compose
+docker-buildx
+
+## Package manager / update tray
+pamac-cli
+pamac-gtk3
+
+## Display manager / login
+lightdm
+lightdm-gtk-greeter
+accountsservice
+
+## Lock screen
+i3lock
+xss-lock
+xorg-xset
+
+## Fonts and icons
+ttf-dejavu
+ttf-liberation
+adwaita-icon-theme
+hicolor-icon-theme
+
+## Desktop integration
+xdg-utils
+xdg-user-dirs
+polkit
+polkit-gnome
+manjaro-hello

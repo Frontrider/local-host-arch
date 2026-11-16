@@ -1,0 +1,15 @@
+[Unit]
+Description=Initialize machine-id for the live session
+Documentation=man:systemd-machine-id-setup(1)
+DefaultDependencies=no
+ConditionPathExists=!/etc/machine-id
+After=systemd-remount-fs.service
+Before=systemd-firstboot.service systemd-user-sessions.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/systemd-machine-id-setup
+
+[Install]
+WantedBy=sysinit.target

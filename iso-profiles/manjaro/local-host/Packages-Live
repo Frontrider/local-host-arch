@@ -1,0 +1,14 @@
+# Packages added on top of rootfs.sfs to build livefs.sfs.
+
+# Installer launched by Manjaro Hello's "Install" button in the live session.
+calamares
+
+# Live session services, user creation and skeleton files.
+manjaro-live-systemd
+manjaro-live-skel
+
+# Theme used by the GRUB menu the ISO boots into.
+grub-theme-live-manjaro
+
+# initcpio helpers shipped by the official live images.
+mkinitcpio-nfs-utils

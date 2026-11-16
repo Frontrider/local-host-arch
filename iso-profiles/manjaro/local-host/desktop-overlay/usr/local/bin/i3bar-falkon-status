@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+#
+# i3bar status command for the local-host-arch live ISO.
+#
+# Statusline blocks:
+#
+#   Menu                  click -> rofi application menu
+#   Close                 click -> close the focused window
+#   Lock                  click -> lock the session
+#   Falkon: admin.awl     click -> falkon
+#   <clock>
+#
+# Update notifications are Manjaro's own tray icon, pamac-tray, which
+# i3bar shows in its built-in XEmbed system tray (tray_output primary).
+# There are deliberately no textual update blocks.
+#
+# i3bar sends click events as JSON lines to this process' stdin; the
+# block "name" lets us recognise them. The header MUST advertise
+# "click_events": true, otherwise i3bar never forwards clicks.
+#
+# Override the browser URL with FALKON_URL if needed.
+
+set -u
+
+FALKON_URL="${FALKON_URL:-http://localhost:8080}"
+
+launch_falkon() {
+    command -v falkon >/dev/null 2>&1 || return 0
+    # setsid keeps the browser alive if i3bar restarts or reloads the bar.
+    setsid falkon "$FALKON_URL" </dev/null >/tmp/falkon-launch.log 2>&1 &
+}
+
+launch_app_menu() {
+    command -v rofi >/dev/null 2>&1 || return 0
+    setsid rofi -show drun -show-icons </dev/null >/tmp/rofi.log 2>&1 &
+}
+
+close_focused() {
+    command -v i3-msg >/dev/null 2>&1 || return 0
+    i3-msg kill >/dev/null 2>&1 || true
+}
+
+lock_screen() {
+    command -v i3lock >/dev/null 2>&1 || return 0
+    setsid i3lock -c 1d1f21 </dev/null >/tmp/i3lock.log 2>&1 &
+}
+
+emit() {
+    local clock
+    clock=$(date '+%a %d %b %H:%M')
+    printf '[{"name":"menu","full_text":" Menu ","background":"#3b5e8c","color":"#ffffff","border":"#2a4466","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"close","full_text":" Close ","background":"#a33333","color":"#ffffff","border":"#6d1f1f","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"lock","full_text":" Lock ","background":"#5b4b8a","color":"#ffffff","border":"#3f3460","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"falkon","full_text":" Falkon: admin.awl ","background":"#2e7d32","color":"#ffffff","border":"#1b5e20","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"clock","full_text":" %s "}],\n' "$clock"
+}
+
+is_left_click() {
+    [[ $1 =~ \"button\"[[:space:]]*:[[:space:]]*1 ]]
+}
+
+is_block() {
+    [[ $1 =~ \"name\"[[:space:]]*:[[:space:]]*\"$2\" ]]
+}
+
+# First line: protocol version. click_events must be advertised, otherwise
+# i3bar never forwards mouse clicks to this process. Then an endless stream
+# of status arrays.
+printf '{"version":1,"click_events":true}\n'
+printf '[\n'
+
+while :; do
+    emit
+
+    # Collect click events for up to one second before redrawing.
+    while IFS= read -r -t 1 event; do
+        is_left_click "$event" || continue
+        is_block "$event" menu && launch_app_menu
+        is_block "$event" close && close_focused
+        is_block "$event" lock && lock_screen
+        is_block "$event" falkon && launch_falkon
+    done
+done

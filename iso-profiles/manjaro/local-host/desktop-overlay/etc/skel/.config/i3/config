@@ -1,0 +1,118 @@
+# i3 configuration for the local-host-arch live ISO.
+#
+# Mod4 (Super) is the modifier key.
+# The bar is i3bar; its clickable "Falkon: http://localhost:8080" block is provided by
+# /usr/local/bin/i3bar-falkon-status. Rofi (Mod4+d) is the application
+# launcher.
+
+set $mod Mod4
+
+font pango:DejaVu Sans Mono 9
+
+# Launcher
+bindsym $mod+d exec --no-startup-id rofi -show drun -show-icons
+bindsym $mod+Tab exec --no-startup-id rofi -show window
+
+# Terminal
+bindsym $mod+Return exec --no-startup-id xfce4-terminal
+
+# Falkon -- same target as the bar button
+bindsym $mod+b exec --no-startup-id falkon "http://localhost:8080"
+
+# Window management
+bindsym $mod+Shift+q kill
+# i3 has no titlebar buttons; middle-clicking a titlebar closes the window.
+bindsym --release button2 kill
+bindsym $mod+Shift+l exec --no-startup-id i3lock -c 1d1f21
+bindsym $mod+Shift+c reload
+bindsym $mod+Shift+r restart
+bindsym $mod+Shift+e exec --no-startup-id i3-msg exit
+
+# Focus
+bindsym $mod+Left focus left
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+
+# Move windows
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+
+# Workspaces
+set $ws1 "1"
+set $ws2 "2"
+set $ws3 "3"
+set $ws4 "4"
+set $ws5 "5"
+set $ws6 "6"
+set $ws7 "7"
+set $ws8 "8"
+set $ws9 "9"
+set $ws10 "10"
+
+bindsym $mod+1 workspace $ws1
+bindsym $mod+2 workspace $ws2
+bindsym $mod+3 workspace $ws3
+bindsym $mod+4 workspace $ws4
+bindsym $mod+5 workspace $ws5
+bindsym $mod+6 workspace $ws6
+bindsym $mod+7 workspace $ws7
+bindsym $mod+8 workspace $ws8
+bindsym $mod+9 workspace $ws9
+bindsym $mod+0 workspace $ws10
+
+bindsym $mod+Shift+1 move container to workspace $ws1
+bindsym $mod+Shift+2 move container to workspace $ws2
+bindsym $mod+Shift+3 move container to workspace $ws3
+bindsym $mod+Shift+4 move container to workspace $ws4
+bindsym $mod+Shift+5 move container to workspace $ws5
+bindsym $mod+Shift+6 move container to workspace $ws6
+bindsym $mod+Shift+7 move container to workspace $ws7
+bindsym $mod+Shift+8 move container to workspace $ws8
+bindsym $mod+Shift+9 move container to workspace $ws9
+bindsym $mod+Shift+0 move container to workspace $ws10
+
+# Layout
+bindsym $mod+e split toggle
+bindsym $mod+f fullscreen toggle
+
+default_border normal
+default_floating_border normal
+gaps inner 4
+
+# Bar: workspaces on the left, clickable buttons on the right.
+bar {
+    position top
+    status_command /usr/local/bin/i3bar-falkon-status
+    tray_output primary
+    tray_padding 4
+
+    colors {
+        background #1d1f21
+        statusline #c5c8c6
+        separator  #373b41
+        focused_workspace  #2e7d32 #2e7d32 #ffffff
+        active_workspace   #1d1f21 #1d1f21 #c5c8c6
+        inactive_workspace #1d1f21 #1d1f21 #969896
+        urgent_workspace   #cc6666 #cc6666 #ffffff
+    }
+}
+
+exec --no-startup-id xsetroot -solid "#1d1f21"
+
+# Lock screen after 10 minutes of inactivity and on logind lock/sleep.
+exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock -n -c 1d1f21
+exec --no-startup-id xset s 600 600
+
+# Manjaro's update notifier. pamac-tray is a GtkStatusIcon, i.e. an XEmbed
+# tray icon, which i3bar displays natively (tray_output primary).
+exec --no-startup-id sh -c 'GDK_BACKEND=x11 pamac-tray'
+
+# Authentication agent for pamac-manager transactions.
+exec --no-startup-id /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
+
+# Manjaro Hello (welcome / install). Respect its autostart toggle: the
+# package's skel entry is copied to the live user's home.
+exec --no-startup-id sh -c '[ -f "$HOME/.config/autostart/manjaro-hello.desktop" ] && GDK_BACKEND=x11 manjaro-hello'
