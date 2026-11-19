@@ -16,6 +16,10 @@ INTERVAL="${LOCALHOST_COMPOSE_INTERVAL:-30}"
 
 cd "$COMPOSE_DIR" || exit 1
 
+# we assume that the machines won't be stopped frequently.
+docker-compose down --rmi all
+docker compose pull
+
 # The tailscale/anywherelan container needs this; modules-load.d/tun.conf
 # loads the module early, this is only a safety net.
 if [[ ! -e /dev/net/tun ]]; then
@@ -30,6 +34,7 @@ mkdir -p logs/caddy logs/tailscale logs/anywherelan logs/fail2ban logs/host-moni
 until docker info >/dev/null 2>&1; do
     sleep 2
 done
+
 
 while :; do
     if ! docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d; then

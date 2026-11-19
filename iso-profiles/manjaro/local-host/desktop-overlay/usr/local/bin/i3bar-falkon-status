@@ -4,6 +4,8 @@
 #
 # Statusline blocks:
 #
+#   Restart               click -> reboot
+#   Shutdown              click -> power off
 #   Menu                  click -> rofi application menu
 #   Close                 click -> close the focused window
 #   Lock                  click -> lock the session
@@ -57,10 +59,23 @@ launch_network_manager() {
     setsid nm-connection-editor </dev/null >/tmp/nm-connection-editor.log 2>&1 &
 }
 
+# Shutdown/reboot go through logind, whose policy allows the active local
+# session to do both without a password (allow_active=yes for
+# org.freedesktop.login1.power-off and .reboot). No sudo needed.
+reboot_system() {
+    command -v systemctl >/dev/null 2>&1 || return 0
+    systemctl reboot >/tmp/i3bar-reboot.log 2>&1 || true
+}
+
+power_off_system() {
+    command -v systemctl >/dev/null 2>&1 || return 0
+    systemctl poweroff >/tmp/i3bar-poweroff.log 2>&1 || true
+}
+
 emit() {
     local clock
     clock=$(date '+%a %d %b %H:%M')
-    printf '[{"name":"menu","full_text":" Menu ","background":"#3b5e8c","color":"#ffffff","border":"#2a4466","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"close","full_text":" Close ","background":"#a33333","color":"#ffffff","border":"#6d1f1f","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"lock","full_text":" Lock ","background":"#5b4b8a","color":"#ffffff","border":"#3f3460","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"tasks","full_text":" Tasks ","background":"#2f6f6f","color":"#ffffff","border":"#1f4a4a","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"network","full_text":" Network ","background":"#1f5f7a","color":"#ffffff","border":"#123a4a","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"falkon","full_text":" Falkon: admin.awl ","background":"#2e7d32","color":"#ffffff","border":"#1b5e20","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"clock","full_text":" %s "}],\n' "$clock"
+    printf '[{"name":"restart","full_text":" Restart ","background":"#8a6a1f","color":"#ffffff","border":"#5f4915","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"shutdown","full_text":" Shutdown ","background":"#8a2f2f","color":"#ffffff","border":"#5f2020","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"menu","full_text":" Menu ","background":"#3b5e8c","color":"#ffffff","border":"#2a4466","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"close","full_text":" Close ","background":"#a33333","color":"#ffffff","border":"#6d1f1f","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"lock","full_text":" Lock ","background":"#5b4b8a","color":"#ffffff","border":"#3f3460","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"tasks","full_text":" Tasks ","background":"#2f6f6f","color":"#ffffff","border":"#1f4a4a","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"network","full_text":" Network ","background":"#1f5f7a","color":"#ffffff","border":"#123a4a","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"falkon","full_text":" Falkon: admin.awl ","background":"#2e7d32","color":"#ffffff","border":"#1b5e20","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"clock","full_text":" %s "}],\n' "$clock"
 }
 
 is_left_click() {
@@ -89,5 +104,7 @@ while :; do
         is_block "$event" tasks && launch_taskmanager
         is_block "$event" network && launch_network_manager
         is_block "$event" falkon && launch_falkon
+        is_block "$event" restart && reboot_system
+        is_block "$event" shutdown && power_off_system
     done
 done
