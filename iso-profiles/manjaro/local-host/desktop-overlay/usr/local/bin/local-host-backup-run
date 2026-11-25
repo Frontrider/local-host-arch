@@ -1,0 +1,52 @@
+#!/bin/sh
+# Run one NPBackup backup for local-host.
+#
+# /backups is a noauto fstab entry. Mount it for the duration of the backup
+# and unmount it afterwards only if this script mounted it. If the GUI already
+# has it mounted, leave it alone.
+
+set -u
+
+CONFIG="${LOCALHOST_NPBACKUP_CONFIG:-/etc/local-host/npbackup.conf}"
+NPBACKUP="${LOCALHOST_NPBACKUP_CLI:-/opt/npbackup/cli/npbackup-cli}"
+
+if [ ! -x "$NPBACKUP" ]; then
+    echo "local-host backup: $NPBACKUP is missing" >&2
+    exit 1
+fi
+if [ ! -r "$CONFIG" ]; then
+    echo "local-host backup: $CONFIG is missing" >&2
+    exit 1
+fi
+
+# The main and secondary backups can share the backup drive. Serialize them
+# so one job cannot unmount /backups while the other is still using it.
+LOCK_FILE="${LOCALHOST_BACKUP_LOCK:-/run/local-host-backup.lock}"
+exec 9>"$LOCK_FILE" || exit 1
+if ! flock -w 3600 9; then
+    echo "local-host backup: another backup is still running" >&2
+    exit 1
+fi
+
+mounted_here=0
+if ! mountpoint -q /backups; then
+    if ! mount /backups; then
+        echo "local-host backup: cannot mount /backups" >&2
+        exit 1
+    fi
+    mounted_here=1
+fi
+
+cleanup() {
+    if [ "$mounted_here" -eq 1 ]; then
+        umount /backups 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT HUP INT TERM
+
+"$NPBACKUP" --config-file "$CONFIG" --repo-name default --backup
+status=$?
+
+cleanup
+trap - EXIT HUP INT TERM
+exit "$status"

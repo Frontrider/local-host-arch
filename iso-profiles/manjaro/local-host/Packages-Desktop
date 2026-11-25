@@ -1,13 +1,23 @@
 # Packages added on top of rootfs.sfs to build desktopfs.sfs (and then
 # livefs.sfs, which overlays it).
 
-## Xorg
-xorg-server
+## Xorg / Xlibre
+# Xlibre was selected because it has more leagcy support, and support in general
+# and we don't care for propriatary drivers. 
+# The open source ones will still provide a graphical output.
+#xorg-server
 xorg-xinit
 xorg-xrandr
 xorg-xsetroot
-xf86-input-libinput
-xf86-video-vesa
+#xf86-input-libinput
+#xf86-video-vesa
+xlibre-xserver
+xlibre-input-libinput
+xlibre-video-vesa
+xlibre-video-amdgpu
+xlibre-video-ati
+xlibre-video-intel
+xlibre-input-synaptics
 mesa
 
 ## Window manager and launcher
@@ -16,7 +26,6 @@ rofi
 
 ## Terminal emulators
 xfce4-terminal
-xterm
 
 ## File manager
 thunar
@@ -41,6 +50,10 @@ docker
 docker-compose
 docker-buildx
 
+## Backups
+restic
+rclone
+
 ## Package manager / update tray
 pamac-cli
 pamac-gtk3
@@ -64,4 +77,3 @@ xdg-utils
 xdg-user-dirs
 polkit
 polkit-gnome
-manjaro-hello

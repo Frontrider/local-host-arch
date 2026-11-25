@@ -1,0 +1,13 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 1089,
+      "ypos": 764,
+      "width": 85,
+      "height": 26
+    }
+  ],
+  "properties": [],
+  "tags": ["install-next"]
+}

@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 203,
+      "ypos": 424,
+      "width": 300,
+      "height": 20,
+      "click_point": {
+        "xpos": 13,
+        "ypos": 10,
+        "id": "review-storage-keep-system"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["review-storage-keep-system"]
+}

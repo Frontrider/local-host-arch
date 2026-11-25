@@ -1,0 +1,15 @@
+{
+  "area" : [
+    {
+      "type" : "match",
+      "xpos" : 1190,
+      "ypos" : 764,
+      "width" : 76,
+      "height" : 26
+    }
+  ],
+  "properties" : [],
+  "tags" : [
+    "install-cancel"
+  ]
+}

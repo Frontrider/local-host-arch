@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Backup
+Comment=Inspect snapshots and restore files with NPBackup
+Exec=sudo -n /usr/local/bin/local-host-backup-gui
+Icon=drive-harddisk
+Terminal=false
+Categories=System;Utility;
+StartupNotify=false

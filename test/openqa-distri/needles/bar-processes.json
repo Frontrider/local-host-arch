@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 733,
+      "ypos": 4,
+      "width": 83,
+      "height": 25,
+      "click_point": {
+        "xpos": 41,
+        "ypos": 12,
+        "id": "bar-processes"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["bar-processes"]
+}

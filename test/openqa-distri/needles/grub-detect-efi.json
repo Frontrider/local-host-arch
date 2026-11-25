@@ -1,0 +1,13 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 158,
+      "ypos": 520,
+      "width": 704,
+      "height": 24
+    }
+  ],
+  "properties": [],
+  "tags": ["grub-detect-efi"]
+}

@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 675,
+      "ypos": 478,
+      "width": 94,
+      "height": 22,
+      "click_point": {
+        "xpos": 8,
+        "ypos": 9,
+        "id": "all-done-restart"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["all-done-restart"]
+}

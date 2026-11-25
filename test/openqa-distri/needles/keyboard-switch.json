@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 706,
+      "ypos": 735,
+      "width": 559,
+      "height": 22,
+      "click_point": {
+        "xpos": 279,
+        "ypos": 11,
+        "id": "keyboard-switch"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["keyboard-switch"]
+}

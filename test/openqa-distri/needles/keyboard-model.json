@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 294,
+      "ypos": 287,
+      "width": 926,
+      "height": 22,
+      "click_point": {
+        "xpos": 463,
+        "ypos": 11,
+        "id": "keyboard-model"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["keyboard-model"]
+}

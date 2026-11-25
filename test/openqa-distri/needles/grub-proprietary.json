@@ -1,0 +1,13 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 158,
+      "ypos": 416,
+      "width": 704,
+      "height": 26
+    }
+  ],
+  "properties": [],
+  "tags": ["grub-proprietary"]
+}

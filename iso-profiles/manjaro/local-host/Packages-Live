@@ -1,7 +1,18 @@
 # Packages added on top of rootfs.sfs to build livefs.sfs.
 
-# Installer launched by Manjaro Hello's "Install" button in the live session.
+# Calamares installer. It starts automatically in the live session and is
+# restarted from the i3 bar Installer button or Super+I after a cancel.
 calamares
+python3
+
+# Partition editor for preparing disks in the live session.
+gparted
+
+# FAI setup-storage, vendored under /usr/bin and /usr/share/fai in the
+# live overlay. Parse::RecDescent is its parser generator; parted does the
+# actual partition-table writes.
+perl-parse-recdescent
+parted
 
 # Live session services, user creation and skeleton files.
 manjaro-live-systemd

@@ -1,0 +1,16 @@
+---
+# local-host compatibility module.
+#
+# The stock bootloader module declares requiredModules: [ "partition" ].
+# This image does the actual partitioning in local-host-setup-storage with
+# FAI setup-storage, but Calamares still requires a loaded module named
+# "partition" before bootloader.
+#
+# This descriptor replaces the unused stock partition view module at its
+# normal path. It is a no-op Python job, so Calamares' dependency check is
+# satisfied without loading the stock partition GUI or running its jobs.
+type:       "job"
+interface:  "python"
+name:       "partition"
+script:     "main.py"
+noconfig:   true

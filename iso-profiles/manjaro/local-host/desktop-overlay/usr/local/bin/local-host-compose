@@ -13,12 +13,9 @@ COMPOSE_DIR="${LOCALHOST_COMPOSE_DIR:-/etc/local-host}"
 COMPOSE_FILE="$COMPOSE_DIR/docker-compose.yaml"
 ENV_FILE="$COMPOSE_DIR/env"
 INTERVAL="${LOCALHOST_COMPOSE_INTERVAL:-30}"
+PULL_INTERVAL="${LOCALHOST_COMPOSE_PULL_INTERVAL:-21600}"
 
 cd "$COMPOSE_DIR" || exit 1
-
-# we assume that the machines won't be stopped frequently.
-docker-compose down --rmi all
-docker compose pull
 
 # The tailscale/anywherelan container needs this; modules-load.d/tun.conf
 # loads the module early, this is only a safety net.
@@ -30,17 +27,44 @@ fi
 # root too, but doing it here keeps the tree predictable.
 mkdir -p logs/caddy logs/tailscale logs/anywherelan logs/fail2ban logs/host-monitor
 
+# Host paths used by the named volumes. The local volume driver with
+# "o: bind" does not create missing source directories, so "up" would fail
+# on a fresh install. /data itself is normally created by tmpfiles.d or is
+# the mount point of a separate data disk.
+mkdir -p /data/app-manager /data/data /data/tailscale /data/core /data/awl
+
 # Wait for dockerd (docker.service may still be starting).
 until docker info >/dev/null 2>&1; do
     sleep 2
 done
 
 
+# Images are updated by pulling first. Old images are pruned only after a
+# successful pull and up, so a boot without Wi-Fi keeps the existing images
+# instead of deleting them and leaving nothing to start.
+last_pull=0
 while :; do
+    now=$(date +%s)
+    if (( now - last_pull >= PULL_INTERVAL )); then
+        # Avoid starting a compose pull while Wi-Fi/DNS is still coming up.
+        if ! getent hosts ghcr.io >/dev/null 2>&1; then
+            echo "local-host compose: waiting for network" >&2
+            sleep 5
+            continue
+        fi
+        if ! docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull --policy always; then
+            echo "local-host compose: pull failed, retrying in 10s" >&2
+            sleep 10
+            continue
+        fi
+        last_pull=$now
+    fi
     if ! docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d; then
         echo "local-host compose: up failed, retrying in 10s" >&2
         sleep 10
         continue
     fi
+    # Remove old image versions now that no container uses them.
+    docker image prune -af >/dev/null 2>&1 || true
     sleep "$INTERVAL"
 done

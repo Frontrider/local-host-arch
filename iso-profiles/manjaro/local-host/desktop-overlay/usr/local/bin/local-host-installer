@@ -1,0 +1,27 @@
+#!/bin/sh
+# Launch the Calamares installer from the live medium.
+#
+# Autostarted by i3 in the live session; also used by the i3bar Installer
+# button and the Super+I keybinding. On an installed system this exits
+# immediately.
+
+set -u
+
+if ! { [ -e /run/miso/bootmnt ] || [ -e /run/archiso/bootmnt ] \
+       || [ -e /run/ventoy ] \
+       || [ -e /etc/systemd/system/live-machine-id.service ]; }; then
+    exit 0
+fi
+
+# Do not start a second instance.
+if pgrep -x calamares >/dev/null 2>&1 \
+   || pgrep -f 'calamares_polkit' >/dev/null 2>&1; then
+    exit 0
+fi
+
+if command -v calamares_polkit >/dev/null 2>&1; then
+    exec calamares_polkit
+fi
+if command -v calamares >/dev/null 2>&1; then
+    exec pkexec calamares
+fi

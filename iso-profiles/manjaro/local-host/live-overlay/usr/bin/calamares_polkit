@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# Manjaro's Calamares launcher. -X makes Calamares read the local-host
+# settings from /etc/xdg/calamares/settings.conf. The generated
+# /etc/calamares/settings.conf is left untouched.
+
+export XDG_CONFIG_DIRS=/etc/xdg
+
+if command -v pkexec >/dev/null 2>&1; then
+    pkexec --disable-internal-agent env DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" DISPLAY="$DISPLAY" GNOME_DESKTOP_SESSION_ID="$GNOME_DESKTOP_SESSION_ID" HOME="$HOME" KDE_FULL_SESSION="$KDE_FULL_SESSION" KDE_SESSION_VERSION="$KDE_SESSION_VERSION" QT_STYLE_OVERRIDE="$QT_STYLE_OVERRIDE" QT_QPA_PLATFORMTHEME="$QT_QPA_PLATFORMTHEME" QT_XCB_FORCE_SOFTWARE_OPENGL="$QT_XCB_FORCE_SOFTWARE_OPENGL" XAUTHORITY="$XAUTHORITY" XDG_CURRENT_DESKTOP="$XDG_CURRENT_DESKTOP" XDG_CONFIG_DIRS="$XDG_CONFIG_DIRS" "/usr/bin/calamares" "-D6" "-X" "$@"
+else
+    /usr/bin/calamares "-D6" "-X" "$@"
+fi

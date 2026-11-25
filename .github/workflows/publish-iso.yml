@@ -19,6 +19,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The checks that need no ISO run on their own runner, in parallel with the
+  # build, so a broken script or QML page is reported long before the ISO is
+  # ready.
+  checks-no-iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checks that need no ISO
+        run: bash test/run-docker.sh --static
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 240
@@ -93,6 +107,17 @@ jobs:
             '
           sudo chown -R "$(id -u):$(id -g)" out work/logs 2>/dev/null || true
 
+      - name: Verify ISO
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+          # Builds always start from scratch, so the chroots are not reused.
+          # Removing them frees the space needed to unpack the live filesystem.
+          sudo rm -rf work/chroots
+          df -h /
+          bash test/run-docker.sh
+          df -h /
+
       - name: Collect ISO and checksum
         run: |
           set -euo pipefail
@@ -112,19 +137,6 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-      - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --clobber
-          else
-            gh release create "$TAG" dist/* --title "$TAG" --generate-notes
-          fi
-
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -133,3 +145,32 @@ jobs:
           path: work/logs
           if-no-files-found: ignore
           retention-days: 7
+
+  # Publishing waits for both jobs, so a release is never created while the
+  # no-ISO checks are still failing.
+  publish:
+    needs: [checks-no-iso, build]
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Download ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: local-host-arch-iso-${{ github.run_number }}
+          path: dist
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          ls -lh dist
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "$TAG" --generate-notes
+          fi

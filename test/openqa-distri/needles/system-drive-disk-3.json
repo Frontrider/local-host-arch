@@ -1,0 +1,20 @@
+{
+  "area" : [
+    {
+      "type" : "match",
+      "xpos" : 203,
+      "ypos" : 276,
+      "width" : 320,
+      "height" : 30,
+      "click_point" : {
+        "xpos" : 13,
+        "ypos" : 8,
+        "id" : "system-drive-disk-3"
+      }
+    }
+  ],
+  "properties" : [],
+  "tags" : [
+    "system-drive-disk-3"
+  ]
+}

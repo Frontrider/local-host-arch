@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 183,
+      "ypos": 735,
+      "width": 401,
+      "height": 22,
+      "click_point": {
+        "xpos": 200,
+        "ypos": 11,
+        "id": "keyboard-test"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["keyboard-test"]
+}

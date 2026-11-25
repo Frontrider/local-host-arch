@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 203,
+      "ypos": 416,
+      "width": 418,
+      "height": 20,
+      "click_point": {
+        "xpos": 209,
+        "ypos": 10,
+        "id": "system-drive-swap"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["system-drive-swap"]
+}

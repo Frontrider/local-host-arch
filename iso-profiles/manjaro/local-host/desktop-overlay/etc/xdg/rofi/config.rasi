@@ -1,0 +1,7 @@
+@theme "Adapta-Nokto"
+
+configuration {
+    modi: "drun,run,window";
+    show-icons: true;
+    icon-theme: "Adwaita";
+}

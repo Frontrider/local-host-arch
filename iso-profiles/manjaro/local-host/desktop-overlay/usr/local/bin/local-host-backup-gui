@@ -1,0 +1,43 @@
+#!/bin/sh
+# Open the NPBackup GUI as root from the administrator's desktop session.
+#
+# This also runs on the live image. There is normally no backup config or
+# backup disk there, so the GUI is allowed to open anyway; it simply cannot
+# complete backup/restore operations until a repository is configured.
+
+set -u
+
+CONFIG="${LOCALHOST_NPBACKUP_CONFIG:-/etc/local-host/npbackup.conf}"
+NPBACKUP="${LOCALHOST_NPBACKUP_GUI:-/opt/npbackup/gui/npbackup-gui}"
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "local-host backup: run this through sudo" >&2
+    exit 1
+fi
+if [ ! -x "$NPBACKUP" ]; then
+    echo "local-host backup: $NPBACKUP is missing" >&2
+    exit 1
+fi
+
+# sudo preserves DISPLAY and XAUTHORITY through the sudoers rule. Fall back
+# to the invoking administrator's Xauthority file if they are absent.
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+    : "${DISPLAY:=:0}"
+    : "${XAUTHORITY:=/home/$SUDO_USER/.Xauthority}"
+    export DISPLAY XAUTHORITY
+fi
+
+# If a backup disk is configured, make it available. Never let a missing
+# disk stop the GUI from opening: the live image has neither the disk nor a
+# config, and the user still needs the config/restore window.
+mountpoint -q /backups || mount /backups 2>/dev/null || true
+
+if [ -r "$CONFIG" ]; then
+    exec "$NPBACKUP" --config-file "$CONFIG"
+fi
+
+# No generated config yet (live image, or an install without a backup
+# disk). Let NPBackup start its own configuration UI.
+mkdir -p /etc/local-host 2>/dev/null || true
+cd /etc/local-host 2>/dev/null || cd / || true
+exec "$NPBACKUP"

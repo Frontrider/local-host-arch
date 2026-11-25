@@ -4,14 +4,17 @@
 #
 # Statusline blocks:
 #
-#   Restart               click -> reboot
+#   Reboot                click -> reboot
 #   Shutdown              click -> power off
 #   Menu                  click -> rofi application menu
+#   Terminal              click -> xfce4-terminal
+#   Installer             click -> calamares installer (live image only)
+#   Workspaces            click -> rofi workspace switcher
 #   Close                 click -> close the focused window
 #   Lock                  click -> lock the session
-#   Tasks                 click -> xfce4-taskmanager
-#   Network               click -> nm-connection-editor
+#   Processes             click -> xfce4-taskmanager
 #   Falkon: admin.awl     click -> falkon
+#   Backups               click -> open NPBackup (also on the live image)
 #   <clock>
 #
 # Update notifications are Manjaro's own tray icon, pamac-tray, which
@@ -28,15 +31,65 @@ set -u
 
 FALKON_URL="${FALKON_URL:-http://localhost:8080}"
 
+# The live image has live-machine-id.service and a mounted live medium; an
+# installed system has neither. The env override is for testing.
+is_live() {
+    [[ -n ${LOCALHOST_LIVE_MARKER:-} && -e ${LOCALHOST_LIVE_MARKER} ]] && return 0
+    [[ -e /etc/systemd/system/live-machine-id.service ]] && return 0
+    [[ -e /run/miso/bootmnt || -e /run/archiso/bootmnt || -e /run/ventoy ]]
+}
+
+launch_installer() {
+    command -v local-host-installer >/dev/null 2>&1 || return 0
+    setsid local-host-installer </dev/null >/tmp/calamares-launch.log 2>&1 &
+}
+
+launch_terminal() {
+    command -v xfce4-terminal >/dev/null 2>&1 || return 0
+    setsid xfce4-terminal </dev/null >/tmp/xfce4-terminal.log 2>&1 &
+}
+
+launch_backup_gui() {
+    command -v local-host-backup-gui >/dev/null 2>&1 || return 0
+    # The image ships a wheel-only sudoers rule for the wrapper. Fall back to
+    # pkexec if sudo cannot use it (for example before tmpfiles has fixed the
+    # sudoers file mode).
+    if sudo -n -l /usr/local/bin/local-host-backup-gui >/dev/null 2>&1; then
+        setsid sudo -n /usr/local/bin/local-host-backup-gui \
+            </dev/null >>/tmp/i3bar-backup-gui.log 2>&1 &
+    elif command -v pkexec >/dev/null 2>&1; then
+        setsid pkexec /usr/local/bin/local-host-backup-gui \
+            </dev/null >>/tmp/i3bar-backup-gui.log 2>&1 &
+    fi
+}
+
 launch_falkon() {
     command -v falkon >/dev/null 2>&1 || return 0
     # setsid keeps the browser alive if i3bar restarts or reloads the bar.
     setsid falkon "$FALKON_URL" </dev/null >/tmp/falkon-launch.log 2>&1 &
 }
 
+has_backup_service() {
+    command -v systemctl >/dev/null 2>&1 || return 1
+    systemctl cat local-host-backup.service >/dev/null 2>&1
+}
+
+# The backup unit only exists on installed systems where a backup disk was
+# configured. The button is always shown and opens the GUI; the unit is only
+# consulted to reflect the timer/manual backup state.
+BACKUP_AVAILABLE=false
+if ! is_live && has_backup_service; then
+    BACKUP_AVAILABLE=true
+fi
+
 launch_app_menu() {
     command -v rofi >/dev/null 2>&1 || return 0
     setsid rofi -show drun -show-icons </dev/null >/tmp/rofi.log 2>&1 &
+}
+
+launch_workspace_switcher() {
+    command -v i3-workspace-switcher >/dev/null 2>&1 || return 0
+    setsid i3-workspace-switcher </dev/null >/tmp/i3-workspace-switcher.log 2>&1 &
 }
 
 close_focused() {
@@ -54,11 +107,6 @@ launch_taskmanager() {
     setsid xfce4-taskmanager </dev/null >/tmp/xfce4-taskmanager.log 2>&1 &
 }
 
-launch_network_manager() {
-    command -v nm-connection-editor >/dev/null 2>&1 || return 0
-    setsid nm-connection-editor </dev/null >/tmp/nm-connection-editor.log 2>&1 &
-}
-
 # Shutdown/reboot go through logind, whose policy allows the active local
 # session to do both without a password (allow_active=yes for
 # org.freedesktop.login1.power-off and .reboot). No sudo needed.
@@ -73,9 +121,33 @@ power_off_system() {
 }
 
 emit() {
-    local clock
+    local clock json backup_block bstate btext bcolor bborder
     clock=$(date '+%a %d %b %H:%M')
-    printf '[{"name":"restart","full_text":" Restart ","background":"#8a6a1f","color":"#ffffff","border":"#5f4915","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"shutdown","full_text":" Shutdown ","background":"#8a2f2f","color":"#ffffff","border":"#5f2020","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"menu","full_text":" Menu ","background":"#3b5e8c","color":"#ffffff","border":"#2a4466","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"close","full_text":" Close ","background":"#a33333","color":"#ffffff","border":"#6d1f1f","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"lock","full_text":" Lock ","background":"#5b4b8a","color":"#ffffff","border":"#3f3460","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"tasks","full_text":" Tasks ","background":"#2f6f6f","color":"#ffffff","border":"#1f4a4a","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"network","full_text":" Network ","background":"#1f5f7a","color":"#ffffff","border":"#123a4a","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"falkon","full_text":" Falkon: admin.awl ","background":"#2e7d32","color":"#ffffff","border":"#1b5e20","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"clock","full_text":" %s "}],\n' "$clock"
+
+    btext=" Backups "; bcolor="#4f6a3f"; bborder="#354a2a"
+    if $BACKUP_AVAILABLE; then
+        bstate=$(systemctl show -p ActiveState --value \
+            local-host-backup.service 2>/dev/null || true)
+        case $bstate in
+            active|activating|reloading)
+                btext=" Backing up "; bcolor="#8a6a1f"; bborder="#5f4915"
+                ;;
+            failed)
+                btext=" Backup failed "; bcolor="#a33333"; bborder="#6d1f1f"
+                ;;
+        esac
+    fi
+    backup_block=',{"name":"backup","full_text":"'"$btext"'","background":"'"$bcolor"'","color":"#ffffff","border":"'"$bborder"'","border_top":2,"border_bottom":2,"border_left":8,"border_right":8}'
+    json='[{"name":"restart","full_text":" Reboot ","background":"#8a6a1f","color":"#ffffff","border":"#5f4915","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"shutdown","full_text":" Shutdown ","background":"#8a2f2f","color":"#ffffff","border":"#5f2020","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"menu","full_text":" Menu ","background":"#3b5e8c","color":"#ffffff","border":"#2a4466","border_top":2,"border_bottom":2,"border_left":8,"border_right":8}'
+    if is_live; then
+        json+=',{"name":"installer","full_text":" Installer ","background":"#3f7a4f","color":"#ffffff","border":"#2a5235","border_top":2,"border_bottom":2,"border_left":8,"border_right":8}'
+    fi
+    json+=',{"name":"terminal","full_text":" Terminal ","background":"#4f6a3f","color":"#ffffff","border":"#354a2a","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"workspaces","full_text":" Workspaces ","background":"#6a4f7a","color":"#ffffff","border":"#4a3756","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"close","full_text":" Close ","background":"#a33333","color":"#ffffff","border":"#6d1f1f","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"lock","full_text":" Lock ","background":"#5b4b8a","color":"#ffffff","border":"#3f3460","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"tasks","full_text":" Processes ","background":"#2f6f6f","color":"#ffffff","border":"#1f4a4a","border_top":2,"border_bottom":2,"border_left":8,"border_right":8},{"name":"falkon","full_text":" Falkon: admin.awl ","background":"#2e7d32","color":"#ffffff","border":"#1b5e20","border_top":2,"border_bottom":2,"border_left":8,"border_right":8}'
+    json+="$backup_block"
+    # The spacer keeps the clock away from the tray icons. i3bar's tray
+    # padding covers the right/top/bottom of the tray, not its left side.
+    json+=',{"name":"clock","full_text":" '"$clock"' "},{"name":"spacer","full_text":" ","min_width":16,"align":"center"}]'
+    printf '%s,\n' "$json"
 }
 
 is_left_click() {
@@ -99,11 +171,14 @@ while :; do
     while IFS= read -r -t 1 event; do
         is_left_click "$event" || continue
         is_block "$event" menu && launch_app_menu
+        is_block "$event" terminal && launch_terminal
+        is_block "$event" installer && launch_installer
+        is_block "$event" workspaces && launch_workspace_switcher
         is_block "$event" close && close_focused
         is_block "$event" lock && lock_screen
         is_block "$event" tasks && launch_taskmanager
-        is_block "$event" network && launch_network_manager
         is_block "$event" falkon && launch_falkon
+        is_block "$event" backup && launch_backup_gui
         is_block "$event" restart && reboot_system
         is_block "$event" shutdown && power_off_system
     done

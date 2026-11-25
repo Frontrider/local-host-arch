@@ -1,0 +1,20 @@
+{
+  "area" : [
+    {
+      "type" : "match",
+      "xpos" : 1002,
+      "ypos" : 763,
+      "width" : 85,
+      "height" : 26,
+      "click_point" : {
+        "xpos" : 42.0,
+        "ypos" : 13.0,
+        "id" : "system-drive-back"
+      }
+    }
+  ],
+  "properties" : [],
+  "tags" : [
+    "system-drive-back"
+  ]
+}

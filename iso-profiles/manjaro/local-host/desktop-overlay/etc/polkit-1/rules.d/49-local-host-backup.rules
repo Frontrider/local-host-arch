@@ -1,0 +1,11 @@
+// Allow the active local desktop session to trigger a manual backup from
+// the i3bar. The unit only reads /data and writes to the backup disk, and
+// the button is only reachable from the logged-in desktop session.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") == "local-host-backup.service" &&
+        action.lookup("verb") == "start" &&
+        subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});

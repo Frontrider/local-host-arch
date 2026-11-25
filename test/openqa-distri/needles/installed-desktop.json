@@ -1,0 +1,13 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 218,
+      "ypos": 1,
+      "width": 248,
+      "height": 27
+    }
+  ],
+  "properties": [],
+  "tags": ["installed-desktop"]
+}

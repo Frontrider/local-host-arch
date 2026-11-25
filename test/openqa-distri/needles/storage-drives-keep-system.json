@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 203,
+      "ypos": 176,
+      "width": 470,
+      "height": 22,
+      "click_point": {
+        "xpos": 13,
+        "ypos": 8,
+        "id": "storage-drives-keep-system"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["storage-drives-keep-system"]
+}

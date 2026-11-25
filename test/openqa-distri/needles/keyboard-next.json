@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 1090,
+      "ypos": 763,
+      "width": 87,
+      "height": 26,
+      "click_point": {
+        "xpos": 44,
+        "ypos": 13,
+        "id": "keyboard-next"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["keyboard-next"]
+}

@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 217,
+      "ypos": 4,
+      "width": 50,
+      "height": 25,
+      "click_point": {
+        "xpos": 25,
+        "ypos": 12,
+        "id": "bar-menu"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["bar-menu"]
+}

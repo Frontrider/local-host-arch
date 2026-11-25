@@ -1,0 +1,11 @@
+[Unit]
+Description=Prepare the Calamares /data device step
+After=local-fs.target
+Before=lightdm.service
+
+[Service]
+Type=oneshot
+ExecStart=-/usr/local/bin/local-host-data-devices.py
+
+[Install]
+WantedBy=multi-user.target

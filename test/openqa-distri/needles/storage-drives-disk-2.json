@@ -1,0 +1,21 @@
+{
+  "area" : [
+    {
+      "type" : "match",
+      "xpos" : 203,
+      "ypos" : 256,
+      "width" : 420,
+      "height" : 22,
+      "margin" : 12,
+      "click_point" : {
+        "xpos" : 13,
+        "ypos" : 10,
+        "id" : "storage-drives-disk-2"
+      }
+    }
+  ],
+  "properties" : [],
+  "tags" : [
+    "storage-drives-disk-2"
+  ]
+}

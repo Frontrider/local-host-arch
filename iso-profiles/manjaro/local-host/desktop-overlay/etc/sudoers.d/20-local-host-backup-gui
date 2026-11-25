@@ -1,0 +1,2 @@
+Defaults:%wheel env_keep += "DISPLAY XAUTHORITY"
+%wheel ALL=(root) NOPASSWD: /usr/local/bin/local-host-backup-gui

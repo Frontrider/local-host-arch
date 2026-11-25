@@ -1,0 +1,5 @@
+---
+type:       "job"
+name:       "local-host-setup-secondary-backup"
+interface:  "python"
+script:     "main.py"

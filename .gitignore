@@ -7,3 +7,9 @@
 
 # CI release staging
 /dist/
+
+# Downloaded third-party binaries (NPBackup), never committed.
+/vendor/
+
+# Generated openQA needle pairs; captures and coordinates are tracked.
+/test/openqa-distri/needles/backup-fixtures/

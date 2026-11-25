@@ -1,0 +1,4 @@
+# Keep the Calamares Data storage list in sync with hot-plugged disks.
+# Only add/remove: 'change' also fires during partitioning, which would
+# refresh the list unnecessarily.
+ACTION=="add|remove", SUBSYSTEM=="block", KERNEL!="loop*", RUN+="/usr/local/bin/local-host-data-devices.py"

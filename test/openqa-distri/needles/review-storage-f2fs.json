@@ -1,0 +1,13 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 203,
+      "ypos": 245,
+      "width": 300,
+      "height": 20
+    }
+  ],
+  "properties": [],
+  "tags": ["review-storage-f2fs"]
+}

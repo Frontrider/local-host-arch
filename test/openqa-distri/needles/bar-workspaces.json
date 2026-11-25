@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 487,
+      "ypos": 4,
+      "width": 82,
+      "height": 25,
+      "click_point": {
+        "xpos": 41,
+        "ypos": 12,
+        "id": "bar-workspaces"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["bar-workspaces"]
+}

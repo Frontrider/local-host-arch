@@ -1,0 +1,98 @@
+#!/bin/sh
+# Weekly housekeeping for the secondary restic backup.
+#
+# Applies the retention policy, prunes unreferenced data and mirrors the
+# updated repository to the configured rclone remote.
+
+set -u
+
+CONF="${LOCALHOST_SECONDARY_CONF:-/etc/local-host/secondary-backup.conf}"
+RESTIC="${LOCALHOST_RESTIC:-$(command -v restic 2>/dev/null || true)}"
+
+if [ ! -r "$CONF" ]; then
+    echo "local-host secondary backup: $CONF is missing" >&2
+    exit 1
+fi
+. "$CONF"
+
+if [ "${SECONDARY_BACKUP_ENABLED:-0}" != "1" ]; then
+    exit 0
+fi
+
+REPO="${SECONDARY_BACKUP_REPO:-}"
+PASSWORD_FILE="${SECONDARY_BACKUP_PASSWORD_FILE:-/etc/local-host/restic-secondary-password}"
+RCLONE_CONFIG="${SECONDARY_BACKUP_RCLONE_CONFIG:-/etc/local-host/secondary-rclone.conf}"
+REMOTE="${SECONDARY_BACKUP_REMOTE:-}"
+LOCATION="${SECONDARY_BACKUP_LOCATION:-data}"
+
+if [ -z "$RESTIC" ] || [ ! -x "$RESTIC" ]; then
+    echo "local-host secondary backup: restic is missing" >&2
+    exit 1
+fi
+if [ -z "$REPO" ]; then
+    echo "local-host secondary backup: no repository configured" >&2
+    exit 1
+fi
+if [ ! -r "$PASSWORD_FILE" ]; then
+    echo "local-host secondary backup: $PASSWORD_FILE is missing" >&2
+    exit 1
+fi
+
+LOCK_FILE="${LOCALHOST_BACKUP_LOCK:-/run/local-host-backup.lock}"
+exec 9>"$LOCK_FILE" || exit 1
+if ! flock -w 3600 9; then
+    echo "local-host secondary backup: another backup is still running" >&2
+    exit 1
+fi
+
+mounted_here=0
+cleanup() {
+    if [ "$mounted_here" -eq 1 ]; then
+        umount /backups 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT HUP INT TERM
+
+if [ "$LOCATION" = "drive" ]; then
+    if ! mountpoint -q /backups; then
+        if ! mount /backups; then
+            echo "local-host secondary backup: cannot mount /backups" >&2
+            exit 1
+        fi
+        mounted_here=1
+    fi
+fi
+
+if [ ! -f "$REPO/config" ]; then
+    echo "local-host secondary backup: $REPO is not initialized yet" >&2
+    exit 1
+fi
+
+restic_cmd() {
+    "$RESTIC" --repo "$REPO" --password-file "$PASSWORD_FILE" "$@"
+}
+
+echo "local-host secondary backup: applying retention policy"
+restic_cmd forget \
+    --keep-last 3 \
+    --keep-daily 7 \
+    --keep-weekly 4 \
+    --keep-monthly 12 \
+    --keep-yearly 2 \
+    --prune || exit 1
+
+if [ -n "$REMOTE" ]; then
+    if ! command -v rclone >/dev/null 2>&1; then
+        echo "local-host secondary backup: rclone is missing" >&2
+        exit 1
+    fi
+    if [ ! -r "$RCLONE_CONFIG" ]; then
+        echo "local-host secondary backup: $RCLONE_CONFIG is missing" >&2
+        exit 1
+    fi
+    echo "local-host secondary backup: syncing $REPO to $REMOTE"
+    rclone sync "$REPO" "$REMOTE" --config "$RCLONE_CONFIG" --create-empty-src-dirs || exit 1
+fi
+
+cleanup
+trap - EXIT HUP INT TERM

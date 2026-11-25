@@ -1,0 +1,86 @@
+---
+# Product, machine and test suites for the local-host ISO. Passed to
+# openqa-cli schedule as SCENARIO_DEFINITIONS_YAML_FILE together with
+# DISTRI=local-host VERSION=1 FLAVOR=live ARCH=x86_64 and one of the TEST
+# values below.
+products:
+  local-host:
+    distri: "local-host"
+    flavor: "live"
+    arch: "x86_64"
+    version: '1'
+machines:
+  64bit:
+    backend: "qemu"
+job_templates:
+  install:
+    product: "local-host"
+    machine: "64bit"
+  install-data-drive:
+    product: "local-host"
+    machine: "64bit"
+    settings:
+      # A second, blank disk for /data. The schedule command creates the asset;
+      # see openqa.sh. NUMDISKS must cover both HDD_1 and HDD_2.
+      HDD_2: "empty-data.qcow2"
+      NUMDISKS: "2"
+  install-backup-only:
+    product: "local-host"
+    machine: "64bit"
+    settings:
+      # One blank disk used only as the backup drive; user data stays on the
+      # system drive.
+      HDD_2: "empty-backup.qcow2"
+      NUMDISKS: "2"
+  install-webdav-backup:
+    product: "local-host"
+    machine: "64bit"
+    settings:
+      HDD_2: "empty-backup.qcow2"
+      NUMDISKS: "2"
+  install-backup-drive:
+    product: "local-host"
+    machine: "64bit"
+    settings:
+      # One disk becomes /data and one becomes the backup disk.
+      HDD_2: "empty-data.qcow2"
+      HDD_3: "empty-backup.qcow2"
+      NUMDISKS: "3"
+  install-data-backup-f2fs:
+    product: "local-host"
+    machine: "64bit"
+    settings:
+      HDD_2: "empty-data.qcow2"
+      HDD_3: "empty-backup.qcow2"
+      NUMDISKS: "3"
+  install-raid1:
+    product: "local-host"
+    machine: "64bit"
+    settings:
+      HDD_2: "empty-data.qcow2"
+      HDD_3: "empty-backup.qcow2"
+      NUMDISKS: "3"
+  install-raid0:
+    product: "local-host"
+    machine: "64bit"
+    settings:
+      HDD_2: "empty-data.qcow2"
+      HDD_3: "empty-backup.qcow2"
+      NUMDISKS: "3"
+  install-raid1-backup:
+    product: "local-host"
+    machine: "64bit"
+    settings:
+      # Two disks become the RAID1 data set and the third is the backup.
+      HDD_2: "empty-data.qcow2"
+      HDD_3: "empty-backup.qcow2"
+      HDD_4: "empty-extra.qcow2"
+      NUMDISKS: "4"
+  install-raid1-backup-f2fs:
+    product: "local-host"
+    machine: "64bit"
+    settings:
+      HDD_2: "empty-data.qcow2"
+      HDD_3: "empty-backup.qcow2"
+      HDD_4: "empty-extra.qcow2"
+      NUMDISKS: "4"

@@ -2,7 +2,9 @@
 Description=local-host Docker Compose stack
 Documentation=file:/etc/local-host/docker-compose.yaml
 Requires=docker.service
-After=docker.service network.target
+# local-fs.target makes sure a separate /data disk is mounted before the
+# script creates the volume directories under it.
+After=docker.service network.target local-fs.target
 StartLimitIntervalSec=0
 
 [Service]

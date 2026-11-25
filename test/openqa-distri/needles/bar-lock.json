@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 660,
+      "ypos": 4,
+      "width": 54,
+      "height": 25,
+      "click_point": {
+        "xpos": 27,
+        "ypos": 12,
+        "id": "bar-lock"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["bar-lock"]
+}

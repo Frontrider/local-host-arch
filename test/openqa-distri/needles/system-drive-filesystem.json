@@ -1,0 +1,20 @@
+{
+  "area" : [
+    {
+      "type" : "match",
+      "xpos" : 203,
+      "ypos" : 352,
+      "width" : 558,
+      "height" : 21,
+      "click_point" : {
+        "xpos" : 279.0,
+        "ypos" : 10.0,
+        "id" : "system-drive-filesystem"
+      }
+    }
+  ],
+  "properties" : [],
+  "tags" : [
+    "system-drive-filesystem"
+  ]
+}

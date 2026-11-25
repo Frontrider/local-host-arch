@@ -5,6 +5,9 @@
 # buildiso needs root for its chroots. This script re-executes itself through
 # sudo, but keeps every artefact and every manjaro-tools config file inside
 # this directory (work/), so nothing is written to ~/.config or /var/lib.
+#
+# Every Qt .ts catalog under the profile is recompiled to .qm before buildiso
+# runs, so translation files are never compiled by hand.
 
 set -Eeuo pipefail
 
@@ -24,12 +27,20 @@ COMPRESSION="${COMPRESSION:-zstd}"
 BUILD_MIRROR="${BUILD_MIRROR:-https://mirrors.manjaro.org/repo}"
 BUILD_RETRIES="${BUILD_RETRIES:-3}"
 
+# NPBackup is not packaged for Manjaro/Arch. Its prebuilt Linux bundles are
+# downloaded into vendor/ (git-ignored) and copied into the image through the
+# opt/npbackup symlink in the desktop overlay. Pin the release and checksums
+# so a build cannot silently pick up different binaries.
+# Use upstream's x64 legacy builds: the regular binaries need newer CPU
+# features than the default QEMU guest and some older physical machines have.
+NPBACKUP_VERSION="${NPBACKUP_VERSION:-3.0.4}"
+NPBACKUP_CLI_SHA256="${NPBACKUP_CLI_SHA256:-78df4559e7d32e1f4edeb5d403d75e61105dfae20053dca87306f9f2c388fa5f}"
+NPBACKUP_GUI_SHA256="${NPBACKUP_GUI_SHA256:-c231f6abd711504554e458ac50a363d09627e0f6431f1e51c36cef6e456ae909}"
+NPBACKUP_VENDOR_DIR="$SCRIPT_DIR/vendor/npbackup"
+
 DO_CLEAN=false
 DO_CHECK=false
 NO_CHECK=false
-IMAGES_ONLY=false
-ISO_ONLY=false
-INCREMENTAL=false
 
 PROFILE_DIR="$PROFILES_DIR/$EDITION/$PROFILE"
 CONF_HOME="$WORK_DIR/home"
@@ -54,14 +65,13 @@ Options:
   -d, --compression ALGO   squashfs compression: zstd, xz, gzip, lz4, lzo (default: $COMPRESSION)
   -M, --mirror URL         Manjaro mirror root (default: $BUILD_MIRROR)
       --retries N          retry the build N times on download failures (default: $BUILD_RETRIES)
-  -c, --incremental        keep the existing chroots and reuse build markers
-      --resume             same as --incremental; use after a failed build
-  -x, --images-only        only build squashfs images (no ISO)
-  -z, --iso-only           only repack an ISO from previously built images (implies -c)
       --check              only verify host tools and profile packages, then exit
       --no-check           do not verify profile packages before building
       --clean              remove out/ and work/, then exit
   -h, --help               show this help
+
+Every run builds the complete ISO from scratch. There is no incremental or
+resume mode.
 
 Environment:
   PROFILE, EDITION, KERNEL, BRANCH, COMPRESSION, BUILD_MIRROR, BUILD_RETRIES
@@ -82,9 +92,6 @@ parse_args() {
             -d|--compression)   COMPRESSION="${2:?missing value for $1}"; shift 2 ;;
             -M|--mirror)        BUILD_MIRROR="${2:?missing value for $1}"; shift 2 ;;
             --retries)          BUILD_RETRIES="${2:?missing value for $1}"; shift 2 ;;
-            -c|--incremental|--resume) INCREMENTAL=true; shift ;;
-            -x|--images-only)   IMAGES_ONLY=true; shift ;;
-            -z|--iso-only)      ISO_ONLY=true; INCREMENTAL=true; shift ;;
             --check)            DO_CHECK=true; shift ;;
             --no-check)         NO_CHECK=true; shift ;;
             --clean)            DO_CLEAN=true; shift ;;
@@ -101,9 +108,6 @@ parse_args() {
     [[ $BUILD_MIRROR == http://* || $BUILD_MIRROR == https://* ]] \
         || die "mirror must be an http(s) URL: $BUILD_MIRROR"
     [[ $BUILD_RETRIES =~ ^[0-9]+$ ]] || die "retries must be a number: $BUILD_RETRIES"
-    if $IMAGES_ONLY && $ISO_ONLY; then
-        die "--images-only and --iso-only cannot be combined"
-    fi
 }
 
 # Print the package names in a profile package list, after applying the same
@@ -125,14 +129,124 @@ declare -A CMD_PACKAGE=(
     [kwalify]=ruby-kwalify
     [mkfs.fat]=dosfstools
     [mksquashfs]=squashfs-tools
+    [unsquashfs]=squashfs-tools
+    [cmp]=diffutils
     [grub-mkstandalone]=grub
     [pacman]=pacman
     [rsync]=rsync
     [openssl]=openssl
+    [curl]=curl
     [git]=git
     [qemu-system-x86_64]=qemu-base
     [qemu-img]=qemu-base
 )
+
+# The package preflight normally resolves against the host's pacman databases.
+# A profile user-repos.conf adds third-party repositories the host does not
+# know about, so build a throwaway pacman config/database for the preflight
+# instead of modifying the host's pacman setup.
+CHECK_PACMAN_CONF=""
+CHECK_PACMAN_DIR=""
+
+prepare_check_pacman() {
+    local user_conf="$PROFILE_DIR/user-repos.conf"
+    local host_conf=/etc/pacman.conf
+    local arch repo server url db f arch_line user_repos_ok=true
+
+    CHECK_PACMAN_CONF=""
+    CHECK_PACMAN_DIR=""
+
+    [[ -r $user_conf && -r $host_conf ]] || return 0
+    command -v pacman >/dev/null 2>&1 || return 0
+    command -v curl >/dev/null 2>&1 || return 0
+
+    CHECK_PACMAN_DIR=$(mktemp -d "${TMPDIR:-/tmp}/local-host-check.XXXXXX") || {
+        CHECK_PACMAN_DIR=""
+        return 0
+    }
+    mkdir -p "$CHECK_PACMAN_DIR/sync" || { CHECK_PACMAN_DIR=""; return 0; }
+
+    # Reuse the host's already-synced official databases.
+    for f in /var/lib/pacman/sync/*.db /var/lib/pacman/sync/*.files; do
+        [[ -e $f ]] || continue
+        ln -s "$f" "$CHECK_PACMAN_DIR/sync/" 2>/dev/null || true
+    done
+
+    # Fetch each extra repository's database into the temporary DBPath.
+    arch=$(uname -m)
+    while read -r repo server; do
+        [[ -n $repo && -n $server ]] || continue
+        url=${server//\$repo/$repo}
+        url=${url//\$arch/$arch}
+        db="$CHECK_PACMAN_DIR/sync/$repo.db"
+        # The host sync directory may already contain this repository (or a
+        # symlink to it); never write through that. Remove it first.
+        rm -f -- "$db"
+        if curl -fsSL --max-time 30 -o "$db" "$url/$repo.db"; then
+            info "ok       [$repo] database"
+        else
+            warn "could not download [$repo] database from $url"
+            rm -f -- "$db"
+            user_repos_ok=false
+        fi
+    done < <(awk '
+        /^[[:space:]]*\[/ {
+            repo = $0
+            sub(/^[[:space:]]*\[/, "", repo)
+            sub(/\][[:space:]]*$/, "", repo)
+        }
+        /^[[:space:]]*Server[[:space:]]*=/ {
+            server = $0
+            sub(/^[^=]*=[[:space:]]*/, "", server)
+            sub(/[[:space:]]+$/, "", server)
+            if (repo != "" && server != "") print repo, server
+        }
+    ' "$user_conf")
+
+    grep -qE '^[[:space:]]*Architecture[[:space:]]*=' "$host_conf" \
+        && arch_line="" || arch_line="Architecture = auto"
+
+    awk -v archline="$arch_line" \
+        -v dbpath="$CHECK_PACMAN_DIR/" \
+        -v logfile="$CHECK_PACMAN_DIR/pacman.log" '
+        /^\[options\]/ { in_options = 1; print; next }
+        in_options && /^\[/ {
+            if (archline != "") print archline
+            print "DBPath = " dbpath
+            print "LogFile = " logfile
+            in_options = 0
+        }
+        { print }
+        END {
+            if (in_options) {
+                if (archline != "") print archline
+                print "DBPath = " dbpath
+                print "LogFile = " logfile
+            }
+        }
+    ' "$host_conf" > "$CHECK_PACMAN_DIR/pacman.conf" || {
+        CHECK_PACMAN_DIR=""
+        return 0
+    }
+    if $user_repos_ok; then
+        cat "$user_conf" >> "$CHECK_PACMAN_DIR/pacman.conf" || {
+            CHECK_PACMAN_DIR=""
+            return 0
+        }
+    else
+        warn "user repositories omitted from the preflight check"
+    fi
+    CHECK_PACMAN_CONF="$CHECK_PACMAN_DIR/pacman.conf"
+}
+
+check_pacman() {
+    if [[ -n $CHECK_PACMAN_CONF ]]; then
+        pacman --config "$CHECK_PACMAN_CONF" "$@"
+    else
+        pacman "$@"
+    fi
+}
+
 
 run_checks() {
     local rc=0 missing=() pkg code
@@ -140,8 +254,9 @@ run_checks() {
     msg "Build requirements"
 
     for pkg in buildiso xorriso mktorrent kwalify mkfs.fat mksquashfs \
+               unsquashfs cmp \
                grub-mkstandalone grub-mkimage grub-editenv pacman rsync \
-               openssl perl git; do
+               openssl curl perl git; do
         if command -v "$pkg" >/dev/null 2>&1; then
             info "ok       $pkg"
         else
@@ -150,8 +265,16 @@ run_checks() {
         fi
     done
 
+    if command -v lrelease6 >/dev/null 2>&1 || command -v lrelease >/dev/null 2>&1; then
+        info "ok       lrelease (translation catalogs)"
+    else
+        info "MISSING  lrelease  (package: qt6-tools)"
+        rc=1
+    fi
+
     for pkg in /usr/lib/manjaro-tools/util-yaml.sh \
                /usr/lib/manjaro-tools/util-iso.sh \
+               /usr/lib/manjaro-tools/util-iso-image.sh \
                /usr/share/manjaro-tools/pacman-default.conf; do
         if [[ -r $pkg ]]; then
             info "ok       $pkg"
@@ -185,7 +308,8 @@ run_checks() {
 
     msg "Packages for $EDITION/$PROFILE (kernel: $KERNEL)"
     if command -v pacman >/dev/null 2>&1; then
-        if pacman -Si "$KERNEL" >/dev/null 2>&1; then
+        prepare_check_pacman
+        if check_pacman -Si "$KERNEL" >/dev/null 2>&1; then
             info "ok       $KERNEL"
         else
             info "MISSING  $KERNEL (not found in the configured repos)"
@@ -197,7 +321,7 @@ run_checks() {
             missing=()
             while read -r pkg; do
                 [[ -z $pkg ]] && continue
-                pacman -Sp --print-format '%n' "$pkg" >/dev/null 2>&1 \
+                check_pacman -Sp --print-format '%n' "$pkg" >/dev/null 2>&1 \
                     || missing+=("$pkg")
             done < <(for l in "${lists[@]}"; do profile_packages "$l"; done)
             if ((${#missing[@]})); then
@@ -256,6 +380,12 @@ run_checks() {
         fi
     done
 
+    if [[ -n $CHECK_PACMAN_DIR ]]; then
+        rm -rf -- "$CHECK_PACMAN_DIR"
+        CHECK_PACMAN_DIR=""
+        CHECK_PACMAN_CONF=""
+    fi
+
     return "$rc"
 }
 
@@ -279,108 +409,154 @@ EOF
     chown -R "$RUN_UID:$RUN_GID" "$CONF_HOME" "$WORK_DIR/logs" "$WORK_DIR/vm" "$OUT_DIR" 2>/dev/null || true
 }
 
-# --- stale build detection ------------------------------------------------
-# buildiso marks completed image steps with build.make_image_* files and
-# skips them on -c. If the profile, overlays or build parameters change
-# after that, the marking would keep a stale image. The helpers below
-# invalidate exactly the affected images so --resume really reflects the
-# current profile.
+# Fetch the pinned NPBackup prebuilt bundles into vendor/npbackup. The profile
+# contains a symlink at desktop-overlay/opt/npbackup, so buildiso's cp -LR
+# dereferences it and copies the binaries into the image. Keeping the bundles
+# under vendor/ means no large binaries are committed to git.
+prepare_npbackup() {
+    local dir="$NPBACKUP_VENDOR_DIR"
+    local marker="$dir/.version"
+    local base="https://github.com/netinvent/npbackup/releases/download/v$NPBACKUP_VERSION"
+    local tmp cli_url gui_url
 
-sources_newer_than() {
-    local marker=$1
-    local p
-    shift
-    [[ -e $marker ]] || return 1
-    for p in "$@"; do
-        [[ -e $p ]] || continue
-        if [[ -d $p ]]; then
-            [[ $p -nt $marker ]] && return 0
-            [[ -n $(find "$p" -type f -newer "$marker" -print -quit 2>/dev/null) ]] && return 0
-        else
-            [[ $p -nt $marker ]] && return 0
+    if [[ -x "$dir/cli/npbackup-cli" && -x "$dir/gui/npbackup-gui" ]] \
+        && [[ "$(cat "$marker" 2>/dev/null)" == \
+              "$NPBACKUP_VERSION $NPBACKUP_CLI_SHA256 $NPBACKUP_GUI_SHA256" ]]; then
+        info "ok       NPBackup $NPBACKUP_VERSION already vendored"
+        return 0
+    fi
+
+    msg "Vendoring NPBackup $NPBACKUP_VERSION"
+    tmp=$(mktemp -d "$WORK_DIR/tmp/npbackup.XXXXXX") \
+        || die "cannot create a temporary directory for NPBackup"
+    # shellcheck disable=SC2064
+    trap "rm -rf -- '$tmp'" RETURN
+
+    cli_url="$base/npbackup-linux-x64-legacy-cli-public.tar.gz"
+    gui_url="$base/npbackup-linux-x64-legacy-gui-public.tar.gz"
+
+    curl -fL --retry 3 --connect-timeout 15 -o "$tmp/cli.tar.gz" "$cli_url" \
+        || die "cannot download NPBackup CLI $NPBACKUP_VERSION"
+    curl -fL --retry 3 --connect-timeout 15 -o "$tmp/gui.tar.gz" "$gui_url" \
+        || die "cannot download NPBackup GUI $NPBACKUP_VERSION"
+
+    printf '%s  %s\n' "$NPBACKUP_CLI_SHA256" "$tmp/cli.tar.gz" \
+        | sha256sum -c - >/dev/null \
+        || die "NPBackup CLI checksum mismatch"
+    printf '%s  %s\n' "$NPBACKUP_GUI_SHA256" "$tmp/gui.tar.gz" \
+        | sha256sum -c - >/dev/null \
+        || die "NPBackup GUI checksum mismatch"
+
+    mkdir -p "$tmp/cli" "$tmp/gui"
+    tar -xzf "$tmp/cli.tar.gz" -C "$tmp/cli"
+    tar -xzf "$tmp/gui.tar.gz" -C "$tmp/gui"
+    [[ -x "$tmp/cli/npbackup-cli/npbackup-cli" ]] \
+        || die "unexpected NPBackup CLI archive layout"
+    [[ -x "$tmp/gui/npbackup-gui/npbackup-gui" ]] \
+        || die "unexpected NPBackup GUI archive layout"
+
+    rm -rf -- "$dir"
+    mkdir -p "$dir"
+    mv "$tmp/cli/npbackup-cli" "$dir/cli"
+    mv "$tmp/gui/npbackup-gui" "$dir/gui"
+    chmod -R u+rwX,go+rX "$dir"
+    printf '%s %s %s\n' "$NPBACKUP_VERSION" "$NPBACKUP_CLI_SHA256" \
+        "$NPBACKUP_GUI_SHA256" > "$marker"
+    info "ok       NPBackup $NPBACKUP_VERSION"
+}
+
+# Rebuild every Qt translation catalog in the profile. The .qm is written next
+# to its .ts, so the normal overlay copy puts it into the image. This runs on
+# every build, not just when a timestamp looks stale.
+compile_translations() {
+    local lrelease ts qm tmp count=0
+    local -a catalogs=()
+
+    while IFS= read -r -d '' ts; do
+        catalogs+=("$ts")
+    done < <(find "$PROFILE_DIR" -type f -name '*.ts' -print0 | sort -z)
+
+    ((${#catalogs[@]})) || return 0
+
+    if command -v lrelease6 >/dev/null 2>&1; then
+        lrelease=lrelease6
+    elif command -v lrelease >/dev/null 2>&1; then
+        lrelease=lrelease
+    else
+        die "lrelease6/lrelease is required to rebuild ${#catalogs[@]} translation catalog(s); install qt6-tools"
+    fi
+
+    msg "Compiling translation catalogs"
+    for ts in "${catalogs[@]}"; do
+        qm=${ts%.ts}.qm
+        tmp="${qm}.tmp.$$"
+        rm -f -- "$tmp"
+        if ! "$lrelease" -silent "$ts" -qm "$tmp"; then
+            rm -f -- "$tmp"
+            die "failed to compile translation catalog: $ts"
         fi
+        chmod 0644 "$tmp"
+        if [[ -f $qm ]] && cmp -s "$tmp" "$qm"; then
+            # Unchanged: match the source mtime so a --resume build does not
+            # invalidate a cached image.
+            touch -r "$ts" "$tmp"
+        else
+            # New content: make sure stale-image detection notices it.
+            touch "$tmp"
+        fi
+        mv -f -- "$tmp" "$qm"
+        # The build runs as root; keep the generated catalog owned by the
+        # invoking user like the rest of the profile.
+        chown "$RUN_UID:$RUN_GID" "$qm" 2>/dev/null || true
+        info "rebuilt ${qm#"$PROFILE_DIR"/}"
+        count=$((count + 1))
     done
-    return 1
+    info "$count catalog(s)"
 }
 
-invalidate_image() {
-    local name=$1 step=$2
-    local arch_dir="$WORK_DIR/chroots/$PROFILE/x86_64"
-    local dir="$arch_dir/$name" marker="$arch_dir/build.$step"
-    if mountpoint -q "$dir" 2>/dev/null; then
-        umount -l "$dir" 2>/dev/null || true
-    fi
-    if [[ -e $dir || -e $marker ]]; then
-        rm -rf --one-file-system -- "$dir" "$marker"
-        info "stale $name image invalidated"
-    fi
-}
+# manjaro-tools' clean_up_image() ends with a full-tree find over the chroot:
+#
+#   find "$1" -name *.pacnew -name *.pacsave -name *.pacorig -delete
+#
+# make_image_root() calls that while /proc, /sys and /dev are still mounted.
+# find then descends into /proc, races with processes exiting, and aborts the
+# build with "Invalid argument" / "No such file or directory". The three
+# -name tests are also ANDed, so the original line deletes nothing.
+#
+# Patch it in place to stay on one filesystem and to match any of the three
+# suffixes. This is the same kind of build-time manjaro-tools patch used by
+# other derivative build scripts.
+patch_manjaro_tools() {
+    local image=/usr/lib/manjaro-tools/util-iso-image.sh
 
-refresh_stale_build_state() {
-    local arch_dir="$WORK_DIR/chroots/$PROFILE/x86_64"
-    local state="$WORK_DIR/.build-state"
-    local root=false desktop=false live=false rebuild_boot=false
-    local kernel_changed=false branch_changed=false compression_changed=false
+    [[ -r $image ]] || {
+        warn "manjaro-tools util-iso-image.sh not found; not patching clean_up_image"
+        return 0
+    }
 
-    [[ -d $arch_dir ]] || return 0
-
-    if [[ -r $state ]]; then
-        # shellcheck disable=SC1090
-        source "$state"
-        [[ -n ${build_state_kernel:-} && ${build_state_kernel} != "$KERNEL" ]] && kernel_changed=true
-        [[ -n ${build_state_branch:-} && ${build_state_branch} != "$BRANCH" ]] && branch_changed=true
-        [[ -n ${build_state_compression:-} && ${build_state_compression} != "$COMPRESSION" ]] && compression_changed=true
+    if grep -qF 'find "$1" -xdev' "$image"; then
+        info "ok       clean_up_image already skips other filesystems"
+        return 0
     fi
 
-    if $kernel_changed || $branch_changed; then
-        root=true
+    # Use variables so Perl does not interpolate the literal $1 in the
+    # upstream line. \Q quotes the pattern text as-is. This also fixes the
+    # ANDed -name tests so any pacnew/pacsave/pacorig file is deleted.
+    perl -0pi -e 'my $old = q{find "$1" -name *.pacnew -name *.pacsave -name *.pacorig -delete}; my $new = q{find "$1" -xdev \\( -name "*.pacnew" -o -name "*.pacsave" -o -name "*.pacorig" \\) -delete}; s/\Q$old\E/$new/;' "$image" \
+        || warn "could not run the clean_up_image patch on $image"
+
+    # Fallback for a changed upstream line: -xdev is the important part;
+    # it keeps find out of /proc, /sys, /dev and /run.
+    if ! grep -qF 'find "$1" -xdev' "$image"; then
+        sed -i 's|find "\$1"|find "\$1" -xdev|' "$image" \
+            || warn "could not add -xdev to $image"
     fi
 
-    if sources_newer_than "$arch_dir/build.make_image_root" \
-        "$PROFILE_DIR/Packages-Root" "$PROFILE_DIR/root-overlay"; then
-        root=true
+    if grep -qF 'find "$1" -xdev' "$image"; then
+        info "patched  clean_up_image: skip pseudo-filesystems"
+    else
+        warn "clean_up_image find line was not patched; the build may fail in make_image_root"
     fi
-    if $root; then
-        invalidate_image rootfs make_image_root
-        desktop=true
-        rebuild_boot=true
-    fi
-
-    if sources_newer_than "$arch_dir/build.make_image_desktop" \
-        "$PROFILE_DIR/Packages-Desktop" "$PROFILE_DIR/desktop-overlay"; then
-        desktop=true
-    fi
-    if $desktop; then
-        invalidate_image desktopfs make_image_desktop
-        live=true
-        rebuild_boot=true
-    fi
-
-    if sources_newer_than "$arch_dir/build.make_image_live" \
-        "$PROFILE_DIR/Packages-Live" "$PROFILE_DIR/live-overlay" \
-        "$PROFILE_DIR/profile.conf" "$PROFILE_DIR/Packages-Desktop" \
-        "$PROFILE_DIR/desktop-overlay"; then
-        live=true
-    fi
-    if $live; then
-        invalidate_image livefs make_image_live
-        rebuild_boot=true
-    fi
-
-    if $compression_changed; then
-        rm -rf --one-file-system -- "$WORK_DIR/chroots/$PROFILE/iso"
-        rebuild_boot=true
-    fi
-
-    if $rebuild_boot; then
-        rm -f -- "$arch_dir/build.make_image_boot" "$arch_dir/build.make_grub"
-    fi
-}
-
-write_build_state() {
-    printf 'build_state_kernel=%q\nbuild_state_branch=%q\nbuild_state_compression=%q\n' \
-        "$KERNEL" "$BRANCH" "$COMPRESSION" > "$WORK_DIR/.build-state"
-    chown "$RUN_UID:$RUN_GID" "$WORK_DIR/.build-state" 2>/dev/null || true
 }
 
 run_build() {
@@ -397,15 +573,11 @@ run_build() {
     local attempt=1 rc=0 log
     log="$WORK_DIR/logs/iso-build-$(date +%Y%m%d-%H%M%S).log"
 
-    if $IMAGES_ONLY; then base+=(-x); fi
-    if $ISO_ONLY; then base+=(-z); fi
-
     while :; do
         local -a args=("${base[@]}")
         local attempt_log="$log.attempt-$attempt"
-        if $INCREMENTAL || ((attempt > 1)); then args+=(-c); fi
 
-        msg "Running buildiso (attempt $attempt/$BUILD_RETRIES)"
+        msg "Running buildiso from scratch (attempt $attempt/$BUILD_RETRIES)"
         info "${args[*]}"
         info "log: $log"
 
@@ -423,20 +595,19 @@ run_build() {
 
         if ((attempt >= BUILD_RETRIES)); then
             warn "buildiso failed (exit $rc) after $attempt attempt(s); log: $log"
-            info "Retry later with: $SCRIPT_PATH --resume"
+            info "Re-run the build from scratch after fixing the cause."
             return "$rc"
         fi
 
         if grep -qiE 'failed retrieving file|failed to retrieve|download library error|connection timed out|could not resolve|operation too slow|failed to download' "$attempt_log"; then
             rm -f "$attempt_log"
             attempt=$((attempt + 1))
-            INCREMENTAL=true
-            warn "download failure; resuming incrementally in $((attempt * 5))s (attempt $attempt/$BUILD_RETRIES)"
+            warn "download failure; retrying from scratch in $((attempt * 5))s (attempt $attempt/$BUILD_RETRIES)"
             sleep $((attempt * 5))
         else
             rm -f "$attempt_log"
             warn "buildiso failed (exit $rc); log: $log"
-            info "After fixing the cause, resume with: $SCRIPT_PATH --resume"
+            info "Re-run the build from scratch after fixing the cause."
             return "$rc"
         fi
     done
@@ -445,6 +616,75 @@ run_build() {
 latest_iso() {
     find "$OUT_DIR" -type f -name '*.iso' -printf '%T@ %p\n' 2>/dev/null \
         | sort -n | tail -n 1 | cut -d' ' -f2-
+}
+
+# Verify that the livefs really received the compatibility partition job.
+# A stale/unapplied overlay would otherwise produce an image that Calamares
+# refuses to start because bootloader requires a module named "partition".
+verify_calamares_compat() {
+    local desc="$WORK_DIR/chroots/$PROFILE/x86_64/livefs/usr/lib/calamares/modules/partition/module.desc"
+    local settings="$WORK_DIR/chroots/$PROFILE/x86_64/livefs/etc/xdg/calamares/settings.conf"
+    if [[ ! -r $desc ]]; then
+        warn "cannot verify partition compatibility module at $desc"
+        return 0
+    fi
+    if ! grep -q '^type:[[:space:]]*"job"' "$desc"; then
+        die "livefs partition module is still the stock viewmodule; overlay was not applied"
+    fi
+    info "ok       Calamares partition compatibility job is present"
+
+    if [[ -r $settings ]]; then
+        local marker
+        for marker in \
+            'instances:' \
+            'packagechooserq@local-partition' \
+            'packagechooserq@data' \
+            'packagechooserq@data-confirm' \
+            'packagechooserq@backup-secondary' \
+            '        - partition' \
+            'local-host-setup-storage' \
+            'data-fstab' \
+            'local-host-setup-secondary-backup'; do
+            grep -qF -- "$marker" "$settings" \
+                || die "livefs Calamares settings is missing: $marker"
+        done
+        info "ok       Calamares local-host settings are present"
+    else
+        warn "cannot verify Calamares settings at $settings"
+    fi
+}
+
+# Every file from the profile overlays must be in the image built from it.
+# The check reads the squashfs files that buildiso leaves in its ISO staging
+# directory, so it validates the real images and not just the chroots.
+verify_profile_overlays() {
+    local sfs_dir="$WORK_DIR/chroots/$PROFILE/iso/manjaro/x86_64"
+    local checker="$SCRIPT_DIR/test/check-overlay-files.sh"
+
+    [[ -r $checker ]] || die "missing overlay checker: $checker"
+    [[ -d $sfs_dir ]] || die "cannot verify overlays: $sfs_dir is missing"
+
+    msg "Verifying profile overlays"
+    bash "$checker" "$sfs_dir" "$PROFILE_DIR" \
+        || die "built images do not contain every file from the profile overlays"
+}
+
+# buildiso always writes the same filename. Give every successful build a
+# unique name so an old ISO can never be mistaken for the one just built.
+unique_iso_name() {
+    local iso base stamp
+    iso=$(latest_iso)
+    [[ -n $iso ]] || return 0
+
+    if [[ $(basename "$iso") =~ -b[0-9]{8}T[0-9]{6}Z\.iso$ ]]; then
+        return 0
+    fi
+
+    stamp=$(date -u +%Y%m%dT%H%M%SZ)
+    base="${iso%.iso}"
+    mv -- "$iso" "${base}-b${stamp}.iso" \
+        || die "cannot rename $iso to a unique name"
+    info "Unique ISO name: ${base}-b${stamp}.iso"
 }
 
 main() {
@@ -482,17 +722,14 @@ main() {
     fi
 
     prepare_dirs
-    if $INCREMENTAL && ! $ISO_ONLY; then
-        refresh_stale_build_state
-    fi
-    write_build_state
+    patch_manjaro_tools
+    prepare_npbackup
+    compile_translations
     run_build
+    verify_profile_overlays
+    verify_calamares_compat
 
-    if $IMAGES_ONLY; then
-        msg "Squashfs images built"
-        info "Continue with: $SCRIPT_PATH --iso-only"
-        exit 0
-    fi
+    unique_iso_name
 
     local iso
     iso=$(latest_iso)
@@ -502,8 +739,9 @@ main() {
     msg "ISO ready"
     info "$iso"
     info "size: $(du -h -- "$iso" | cut -f1)"
+    info "sha256: $(sha256sum -- "$iso" | cut -d' ' -f1)"
     printf '\n'
-    info "Boot it with: $SCRIPT_DIR/run-vm.sh"
+    info "Boot it with: $SCRIPT_DIR/run-vm.sh \"$iso\""
 }
 
 main "$@"

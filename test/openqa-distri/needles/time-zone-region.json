@@ -1,0 +1,20 @@
+{
+  "area" : [
+    {
+      "type" : "match",
+      "xpos" : 191,
+      "ypos" : 550,
+      "width" : 58,
+      "height" : 22,
+      "click_point" : {
+        "xpos" : 56,
+        "ypos" : 11,
+        "id" : "time-zone-region"
+      }
+    }
+  ],
+  "properties" : [],
+  "tags" : [
+    "time-zone-region"
+  ]
+}

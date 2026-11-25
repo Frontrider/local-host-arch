@@ -1,0 +1,48 @@
+#!/bin/sh
+# Run NPBackup housekeeping (quick check, retention policy and prune).
+#
+# This is the weekly companion to local-host-backup-run.
+
+set -u
+
+CONFIG="${LOCALHOST_NPBACKUP_CONFIG:-/etc/local-host/npbackup.conf}"
+NPBACKUP="${LOCALHOST_NPBACKUP_CLI:-/opt/npbackup/cli/npbackup-cli}"
+
+if [ ! -x "$NPBACKUP" ]; then
+    echo "local-host backup: $NPBACKUP is missing" >&2
+    exit 1
+fi
+if [ ! -r "$CONFIG" ]; then
+    echo "local-host backup: $CONFIG is missing" >&2
+    exit 1
+fi
+
+LOCK_FILE="${LOCALHOST_BACKUP_LOCK:-/run/local-host-backup.lock}"
+exec 9>"$LOCK_FILE" || exit 1
+if ! flock -w 3600 9; then
+    echo "local-host backup: another backup is still running" >&2
+    exit 1
+fi
+
+mounted_here=0
+if ! mountpoint -q /backups; then
+    if ! mount /backups; then
+        echo "local-host backup: cannot mount /backups" >&2
+        exit 1
+    fi
+    mounted_here=1
+fi
+
+cleanup() {
+    if [ "$mounted_here" -eq 1 ]; then
+        umount /backups 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT HUP INT TERM
+
+"$NPBACKUP" --config-file "$CONFIG" --repo-name default --housekeeping
+status=$?
+
+cleanup
+trap - EXIT HUP INT TERM
+exit "$status"

@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+#
+# Rofi-based i3 workspace switcher for the local-host desktop.
+#
+# Usage:
+#   i3-workspace-switcher           switch to the selected workspace
+#   i3-workspace-switcher --move    move the focused container there
+#
+# Existing workspaces are listed with the focused one marked, followed by
+# the ten numbered defaults so empty workspaces are still reachable. Typing
+# a name that is not in the list also works; i3 creates it on demand.
+
+set -u
+
+move=false
+[[ ${1:-} == --move ]] && move=true
+
+command -v rofi >/dev/null 2>&1 || exit 0
+command -v i3-msg >/dev/null 2>&1 || exit 0
+
+# i3-msg prints one line of JSON. Split it per workspace and extract the
+# names with sed so the switcher works without jq or python installed.
+json=$(i3-msg -t get_workspaces 2>/dev/null) || exit 0
+per_workspace=$(printf '%s' "$json" | sed 's/},{/}\n{/g')
+
+mapfile -t existing < <(
+    printf '%s\n' "$per_workspace" |
+        sed -n 's/.*"name":"\([^"]*\)".*/\1/p'
+)
+
+current=$(printf '%s\n' "$per_workspace" |
+    grep -F '"focused":true' |
+    sed -n 's/.*"name":"\([^"]*\)".*/\1/p' |
+    head -n1)
+
+# Existing workspaces first, then the numbered defaults; keep order and
+# drop duplicates.
+mapfile -t names < <(
+    {
+        ((${#existing[@]})) && printf '%s\n' "${existing[@]}"
+        printf '%s\n' {1..10}
+    } | awk '!seen[$0]++'
+)
+
+labels=()
+for name in "${names[@]}"; do
+    if [[ $name == "$current" ]]; then
+        labels+=("● $name")
+    else
+        labels+=("  $name")
+    fi
+done
+
+prompt="Switch to workspace"
+$move && prompt="Move to workspace"
+
+selection=$(printf '%s\n' "${labels[@]}" |
+    rofi -dmenu -i -lines 12 -p "$prompt") || exit 0
+[[ -n $selection ]] || exit 0
+
+# Strip the focused marker, indentation and any typed leading whitespace.
+target=${selection#● }
+target=${target#"${target%%[![:space:]]*}"}
+[[ -n $target ]] || exit 0
+
+# i3 commands need the workspace name quoted when it contains spaces.
+target=${target//\"/\\\"}
+if $move; then
+    i3-msg "move container to workspace \"$target\"" >/dev/null 2>&1
+else
+    i3-msg "workspace \"$target\"" >/dev/null 2>&1
+fi

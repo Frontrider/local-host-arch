@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 729,
+      "ypos": 334,
+      "width": 145,
+      "height": 14,
+      "click_point": {
+        "xpos": 24,
+        "ypos": 7,
+        "id": "keyboard-layout-right"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["keyboard-layout-right"]
+}

@@ -1,0 +1,5 @@
+---
+type:       "job"
+name:       "local-host-setup-storage"
+interface:  "python"
+script:     "main.py"

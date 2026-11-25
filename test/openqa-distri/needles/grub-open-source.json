@@ -1,0 +1,15 @@
+{
+  "area" : [
+    {
+      "type" : "match",
+      "xpos" : 160,
+      "ypos" : 380,
+      "width" : 704,
+      "height" : 30
+    }
+  ],
+  "properties" : [],
+  "tags" : [
+    "grub-open-source"
+  ]
+}

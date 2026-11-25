@@ -2,7 +2,7 @@
 #
 # Mod4 (Super) is the modifier key.
 # The bar is i3bar; its clickable "Falkon: http://localhost:8080" block is provided by
-# /usr/local/bin/i3bar-falkon-status. Rofi (Mod4+d) is the application
+# /usr/local/bin/i3bar-falkon-status. Rofi (Mod4+m) is the application
 # launcher.
 
 set $mod Mod4
@@ -10,20 +10,30 @@ set $mod Mod4
 font pango:DejaVu Sans Mono 9
 
 # Launcher
-bindsym $mod+d exec --no-startup-id rofi -show drun -show-icons
 bindsym $mod+Tab exec --no-startup-id rofi -show window
 
 # Terminal
 bindsym $mod+Return exec --no-startup-id xfce4-terminal
 
-# Falkon -- same target as the bar button
-bindsym $mod+b exec --no-startup-id falkon "http://localhost:8080"
+# i3bar menu buttons: Super + first letter of the button label.
+# The manual backup action uses Shift+B so it does not clash with the
+# Backup GUI button.
+bindsym $mod+m exec --no-startup-id rofi -show drun -show-icons
+bindsym $mod+i exec --no-startup-id local-host-installer
+bindsym $mod+c exec --no-startup-id i3-msg kill
+bindsym $mod+l exec --no-startup-id i3lock -c 1d1f21
+bindsym $mod+t exec --no-startup-id xfce4-terminal
+bindsym $mod+p exec --no-startup-id xfce4-taskmanager
+bindsym $mod+f exec --no-startup-id falkon "http://localhost:8080"
+bindsym $mod+b exec --no-startup-id sudo -n /usr/local/bin/local-host-backup-gui
+bindsym $mod+r exec --no-startup-id systemctl reboot
+bindsym $mod+s exec --no-startup-id systemctl poweroff
 
-# Window management
-bindsym $mod+Shift+q kill
+# Workspace switcher: rofi list of existing and numbered workspaces.
+# (Moving a window to a numbered workspace still uses Mod4+Shift+<number>.)
+bindsym $mod+w exec --no-startup-id i3-workspace-switcher
 # i3 has no titlebar buttons; middle-clicking a titlebar closes the window.
 bindsym --release button2 kill
-bindsym $mod+Shift+l exec --no-startup-id i3lock -c 1d1f21
 bindsym $mod+Shift+c reload
 bindsym $mod+Shift+r restart
 bindsym $mod+Shift+e exec --no-startup-id i3-msg exit
@@ -62,6 +72,9 @@ bindsym $mod+7 workspace $ws7
 bindsym $mod+8 workspace $ws8
 bindsym $mod+9 workspace $ws9
 bindsym $mod+0 workspace $ws10
+# Previous/next workspace on the current output.
+bindsym $mod+Ctrl+Left workspace prev_on_output
+bindsym $mod+Ctrl+Right workspace next_on_output
 
 bindsym $mod+Shift+1 move container to workspace $ws1
 bindsym $mod+Shift+2 move container to workspace $ws2
@@ -76,7 +89,9 @@ bindsym $mod+Shift+0 move container to workspace $ws10
 
 # Layout
 bindsym $mod+e split toggle
-bindsym $mod+f fullscreen toggle
+# Falkon now owns Mod4+F; keep a fullscreen escape on Shift+F so a
+# fullscreen guest window cannot hide the bar and keybindings.
+bindsym $mod+Shift+f fullscreen toggle
 
 default_border normal
 default_floating_border normal
@@ -87,7 +102,9 @@ bar {
     position top
     status_command /usr/local/bin/i3bar-falkon-status
     tray_output primary
-    tray_padding 4
+    # Leave room around the tray icons at the right edge and above/below.
+    padding 4px 8px
+    tray_padding 8
 
     colors {
         background #1d1f21
@@ -117,6 +134,9 @@ exec --no-startup-id /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 # snixembed proxies it into i3bar's XEmbed tray.
 exec --no-startup-id sh -c 'snixembed --fork; exec nm-applet'
 
-# Manjaro Hello (welcome / install). Respect its autostart toggle: the
-# package's skel entry is copied to the live user's home.
-exec --no-startup-id sh -c '[ -f "$HOME/.config/autostart/manjaro-hello.desktop" ] && GDK_BACKEND=x11 manjaro-hello'
+# Start the installer as root on the live medium. local-host-installer exits
+# immediately on an installed system. calamares_polkit elevates through pkexec,
+# which the live session authorizes without a password. After a cancel the
+# desktop is left behind, and the bar Installer button or Super+I starts it
+# again.
+exec --no-startup-id local-host-installer

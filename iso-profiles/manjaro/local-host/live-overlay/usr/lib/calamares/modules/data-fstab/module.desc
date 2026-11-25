@@ -1,0 +1,5 @@
+---
+type:       "job"
+name:       "data-fstab"
+interface:  "python"
+script:     "main.py"

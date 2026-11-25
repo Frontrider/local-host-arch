@@ -1,0 +1,20 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 200,
+      "ypos": 95,
+      "width": 160,
+      "height": 12,
+      "click_point": {
+        "xpos": 82,
+        "ypos": 5,
+        "id": "user-name"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": [
+    "user-name"
+  ]
+}

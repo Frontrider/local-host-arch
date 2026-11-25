@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 586,
+      "ypos": 4,
+      "width": 62,
+      "height": 25,
+      "click_point": {
+        "xpos": 31,
+        "ypos": 12,
+        "id": "bar-close"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["bar-close"]
+}

@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 1002,
+      "ypos": 763,
+      "width": 85,
+      "height": 26,
+      "click_point": {
+        "xpos": 42,
+        "ypos": 13,
+        "id": "review-storage-back"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["review-storage-back"]
+}

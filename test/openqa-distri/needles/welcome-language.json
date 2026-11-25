@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 277,
+      "ypos": 682,
+      "width": 948,
+      "height": 22,
+      "click_point": {
+        "xpos": 474,
+        "ypos": 11,
+        "id": "welcome-language"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["welcome-language"]
+}

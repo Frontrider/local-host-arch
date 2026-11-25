@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 1089,
+      "ypos": 764,
+      "width": 85,
+      "height": 26,
+      "click_point": {
+        "xpos": 42,
+        "ypos": 13,
+        "id": "storage-drives-next"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["storage-drives-next"]
+}

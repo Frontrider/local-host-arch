@@ -1,0 +1,18 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 1190,
+      "ypos": 717,
+      "width": 64,
+      "height": 26,
+      "click_point": {
+        "xpos": 32,
+        "ypos": 13,
+        "id": "install-toggle-log"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": ["install-toggle-log"]
+}
