@@ -2,7 +2,6 @@
 # Run the local-host openQA stack with Docker Compose.
 #
 #   bash test/openqa.sh up             # build/start the stack and wait for the UI
-#   bash test/openqa.sh prepare-needles # generate backup fixtures without Docker
 #   bash test/openqa.sh schedule [iso] # schedule every test suite
 #   bash test/openqa.sh schedule-suite NAME [iso]
 #                                      # schedule only one test suite
@@ -90,7 +89,6 @@ die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 usage() {
     cat >&2 <<EOF
 Usage: ${0##*/} {up|status|logs|down|purge}
-       ${0##*/} prepare-needles
        ${0##*/} schedule [iso]          # every test suite
        ${0##*/} schedule-suite NAME [iso]
        ${0##*/} schedule-data-drive [iso]

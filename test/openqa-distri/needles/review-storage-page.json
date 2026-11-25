@@ -1,0 +1,15 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 201,
+      "ypos": 82,
+      "width": 169,
+      "height": 23
+    }
+  ],
+  "properties": [],
+  "tags": [
+    "review-storage-page"
+  ]
+}

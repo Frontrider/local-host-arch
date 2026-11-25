@@ -19,9 +19,7 @@ steps. Use disabled controls and GRUB entries only with `assert_screen`.
 
 ## Backup fixtures
 
-`test/openqa.sh up` and `schedule` prepare the screenshot-backed needles in
-`backup-fixtures/`. For a job restarted from the UI, refresh them first with
-`bash test/openqa.sh prepare-needles` if `backup-buttons.tsv` has changed.
+Keep the JSON and PNG for each test reference together in this directory.
 The install tests verify backup-drive assignment by matching the “Backup
 filesystem” heading, not the disk name from the reference capture.
 

@@ -1,0 +1,20 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 203,
+      "ypos": 621,
+      "width": 230,
+      "height": 24,
+      "click_point": {
+        "xpos": 115,
+        "ypos": 12,
+        "id": "second-backup-webdav-url"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": [
+    "second-backup-webdav-url"
+  ]
+}

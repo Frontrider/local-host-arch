@@ -1,0 +1,20 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 226,
+      "ypos": 139,
+      "width": 301,
+      "height": 18,
+      "click_point": {
+        "xpos": 150,
+        "ypos": 9,
+        "id": "second-backup-enable"
+      }
+    }
+  ],
+  "properties": [],
+  "tags": [
+    "second-backup-enable"
+  ]
+}

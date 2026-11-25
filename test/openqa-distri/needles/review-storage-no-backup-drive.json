@@ -1,0 +1,15 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 226,
+      "ypos": 187,
+      "width": 110,
+      "height": 18
+    }
+  ],
+  "properties": [],
+  "tags": [
+    "review-storage-no-backup-drive"
+  ]
+}

@@ -3,13 +3,41 @@
 Run with:  pytest test/test_static.py
 """
 
-from support import PROFILE, QML_DIR, require, run, shell_scripts
+import json
+import re
+
+from support import PROFILE, QML_DIR, TEST_DIR, require, run, shell_scripts
 
 
 def qml_files():
     files = sorted(QML_DIR.glob("*.qml"))
     assert files, f"no .qml files under {QML_DIR}"
     return files
+
+
+def test_openqa_needle_references():
+    distri = TEST_DIR / "openqa-distri"
+    tags = set()
+    for path in sorted((distri / "needles").glob("*.json")):
+        image = path.with_suffix(".png")
+        assert image.is_file(), f"missing image for {path.name}: {image.name}"
+        with image.open("rb") as png:
+            assert png.read(8) == b"\x89PNG\r\n\x1a\n", f"invalid PNG: {image}"
+        tags.update(json.loads(path.read_text(encoding="utf-8"))["tags"])
+    assert tags, f"no openQA needles found in {distri}"
+
+    # Check literal single tags and arrays, which openQA accepts as alternatives.
+    calls = re.compile(
+        r"""\b(?:assert_screen|check_screen|assert_and_click)\s*\(\s*"""
+        r"""(\[[^\]\n]*\]|'[^'\n]+'|"[^"\n]+")"""
+    )
+    missing = []
+    for path in sorted(distri.rglob("*.pm")):
+        for arg in calls.findall(path.read_text(encoding="utf-8")):
+            for tag in re.findall(r"""['"]([a-z0-9-]+)['"]""", arg):
+                if tag not in tags:
+                    missing.append(f"{path.relative_to(distri)}: {tag}")
+    assert not missing, "missing openQA needles:\n" + "\n".join(missing)
 
 
 def test_shellcheck():

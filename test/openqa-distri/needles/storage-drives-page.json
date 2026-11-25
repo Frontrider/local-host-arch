@@ -1,0 +1,15 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 201,
+      "ypos": 82,
+      "width": 162,
+      "height": 23
+    }
+  ],
+  "properties": [],
+  "tags": [
+    "storage-drives-page"
+  ]
+}
