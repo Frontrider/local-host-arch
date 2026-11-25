@@ -176,20 +176,9 @@ up() {
 
     compose up -d --build
     wait_ready
-    local i
-    for ((i = 0; i < 30; i++)); do
-        if webdav_ready; then
-            printf 'WebDAV test server: ready inside the openQA worker\n'
-            return 0
-        fi
-        sleep 1
-    done
-    die "WebDAV test server did not become ready; check the webdav service logs"
 }
 
 schedule_run() {
-    require_running
-
     local suite=""
     if [[ ${1:-} == --suite ]]; then
         suite=${2:?missing suite name}
@@ -214,7 +203,6 @@ schedule_run() {
         || die "$iso is not in $ISO_DIR; move it there or update the mount"
 
     expose_iso "$iso"
-    prepare_needles
 
     # Blank install and extra-disk images, created once and reused. They are
     # sparse, so creating the unused ones costs no real space.
@@ -260,10 +248,6 @@ schedule_run() {
             die "unknown test suite: $suite"
             ;;
     esac
-
-    if [[ -z $suite || $suite == install-webdav-backup ]]; then
-        webdav_ready || die "WebDAV test server is not ready; run 'bash $0 up' first"
-    fi
 
     printf '==> Scheduling %s (%s)\n' \
         "$(basename -- "$iso")" "${suite:-all test suites}"
