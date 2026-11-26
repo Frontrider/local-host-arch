@@ -1,0 +1,15 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 203,
+      "ypos": 599,
+      "width": 105,
+      "height": 12
+    }
+  ],
+  "properties": [],
+  "tags": [
+    "second-backup-webdav-server-label"
+  ]
+}

@@ -51,20 +51,29 @@ sub configure_webdav {
 
     assert_and_click('second-backup-enable', mousehide => 1);
     assert_and_click('second-backup-on-backup-drive', mousehide => 1);
-    assert_and_click('second-backup-remote-local-only', mousehide => 1);
+
+    # The remote provider combo has a lighter field background in the
+    # reference capture than in the live UI. Anchor on the section heading
+    # and click the combo below it instead of matching the field itself.
+    my $remote = assert_screen('second-backup-remote-heading');
+    click_offset($remote, 76, 68);
     # The provider list starts at local only, then Drive, OneDrive, WebDAV.
     send_key 'down' for 1 .. 3;
     send_key 'ret';
-    assert_screen('second-backup-remote-webdav');
 
-    assert_and_click('second-backup-remote-folder', mousehide => 1);
+    # The fields only exist for WebDAV. Click them from their labels for the
+    # same reason: the captures render field backgrounds differently.
+    my $folder_label = assert_screen('second-backup-remote-folder-label');
+    click_offset($folder_label, 100, 34);
     send_key 'ctrl-a';
     type_string($folder);
-    assert_and_click('second-backup-webdav-url', mousehide => 1);
+
+    my $server_label = assert_screen('second-backup-webdav-server-label');
+    click_offset($server_label, 100, 34);
     type_string('http://10.0.2.2:8081');
-    assert_and_click('second-backup-webdav-username', mousehide => 1);
+    click_offset($server_label, 100, 66);
     type_string('openqa');
-    assert_and_click('second-backup-webdav-password', mousehide => 1);
+    click_offset($server_label, 100, 98);
     type_password('openqa-test');
 }
 

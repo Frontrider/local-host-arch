@@ -1,0 +1,15 @@
+{
+  "area": [
+    {
+      "type": "match",
+      "xpos": 203,
+      "ypos": 519,
+      "width": 96,
+      "height": 12
+    }
+  ],
+  "properties": [],
+  "tags": [
+    "second-backup-remote-folder-label"
+  ]
+}
